@@ -203,7 +203,13 @@ def compare_bound(par, show=False, compare='dot'):
     y = []
     bound_ind = 0
     if len(bound[0]) > 1:
-        bound_ind = len(bound[0]) - 1
+        max_bound = 0
+        index_max = 0
+        for i in range(len(bound[0])):
+            if max_bound < len(bound[0][i]):
+                max_bound = len(bound[0][i])
+                index_max = i
+        bound_ind = index_max
     for i in bound[0][bound_ind]:
         # print(i)
         x.append(float(i[0]))
@@ -359,14 +365,17 @@ def find_par(par, Shotn, time, I_coil, betta_po, li, bounds, show2=False):
     return min_par, res
 
 
-def find_par2(par, Shotn, time, I_coil, betta_po, li, bounds, show2=False):
+def find_par2(par, Shotn, time, I_coil, betta_po, li, bounds, show2=False, how='not_all'):
     dif_list = []
     dif_list2 = []
     min_par = 0
+    min_par_want = 0
     minimum = 1000
 
     res = {'li': [], 'bp': []}
     alf11, alf22 = find_li2(li)
+    k = 0
+    fig = plt.figure()
     for change in range(bounds[0], bounds[1], bounds[2]):
         if par == 'betta_po':
             betta_po = change / 100
@@ -408,8 +417,13 @@ def find_par2(par, Shotn, time, I_coil, betta_po, li, bounds, show2=False):
                     min_par = result['betpol']
                 elif par == 'li':
                     min_par = result['li']
+                    min_par_want = change / 100
             else:
-                break
+                if how == 'all' or k < 2:
+                    k += 1
+                    continue
+                else:
+                    break
         except subprocess.TimeoutExpired:
             print('time over')
             subprocess.check_call("TASKKILL /F /PID {pid} /T".format(pid=process.pid))
@@ -435,7 +449,7 @@ def find_par2(par, Shotn, time, I_coil, betta_po, li, bounds, show2=False):
         plt.grid()
         plt.show()
 
-    return min_par, res
+    return min_par, min_par_want, res
 
 
 

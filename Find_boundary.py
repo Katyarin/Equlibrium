@@ -22,11 +22,13 @@ def bound(file_name, t, plotting=False, ax=0):
         return 0
     boundary = {'time': time[index_time], 'r': rb[index_time][1:], 'z': zb[index_time][1:]}
     Rc = (max(rb[index_time][1:]) + min(rb[index_time][1:])) / 200
+    Rcm = sum(rb[index_time][1:]) / len(rb[index_time][1:]) / 100
+    print(max(rb[index_time][1:]), min(rb[index_time][1:]))
     with open('c:/work/equilibrium/Globus_PET/MCC.json', 'w') as file2:
         json.dump(boundary, file2)
     if plotting == True:
         print('we_here')
         ax.plot(boundary['r'], boundary['z'])
-    return time[index_time], Rc
+    return time[index_time], Rc, Rcm
 
 

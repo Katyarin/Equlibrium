@@ -14,7 +14,7 @@ with open('W' + str(Shotn) + '.txt', 'r') as wfile:
 f1 = '//172.16.12.127/Pub/!!!CURRENT_COIL_METHOD/new_mcc/mcc_%d.json' % Shotn
 f2 = '//172.16.12.127/Pub/!!!CURRENT_COIL_METHOD/old_data/mcc_%d.json' % Shotn
 time = 0.145
-
+time_list = [0.2]
 for time in time_list:
     fig = plt.figure(figsize=(5, 8))
     ax = fig.add_subplot(111)
