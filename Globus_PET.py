@@ -4,6 +4,9 @@ import os
 import niifaRipper
 import numpy as np
 import time as timer
+import matplotlib.pyplot as plt
+import json
+import subprocess
 
 PATH = 'c:/work/equilibrium/Globus_PET/'
 
@@ -133,10 +136,306 @@ def COIL_upd(Shotn, time, I_coil):
             file4.write('\n')
         print('COIL.DAT updated')
 
-#timer.sleep(10)
-#os.system('"c:/work/equilibrium/Globus_PET/helisvf.exe"')
+
+def EVOL_res():
+    EVOL0 = []
+    with open(PATH + 'EVOL0.PRT', 'r') as file2:
+        for line in file2:
+            EVOL0.append(line.split())
+    if len(EVOL0) < 376:
+        return -1
+    else:
+        Rc = (float(EVOL0[388][EVOL0[388].index('Rmax') + 2]) + float(EVOL0[389][EVOL0[389].index('Rmin') + 2])) / 2
+        Result = {'li': float(EVOL0[377][EVOL0[377].index('LI3') + 2]), 'betpol': float(EVOL0[376][EVOL0[376].index('BETpol') + 2]),
+                  'Rc': Rc}
+        return Result
+
+def compare_bound(par, show=False, compare='dot'):
+    out_data = []
+    with open(PATH + 'out.wr', 'r') as file:
+        for line in file:
+            out_data.extend(line.split())
+
+    ni = int(out_data[0])
+    nj = int(out_data[1])
+    ni1 = int(out_data[2])
+    nj1 = int(out_data[3])
+    ni2 = int(out_data[4])
+    nj2 = int(out_data[5])
+    nxb = int(out_data[6])
+
+    rgr = [float(i) for i in out_data[7:ni + 7]]
+    zgr = [float(i) for i in out_data[ni + 7:ni + nj + 7]]
+
+    nugr = ni + nj + 7
+
+    ugr = []
+    curf = []
+
+    for j in range(nj):
+        ugr.append(out_data[nugr + ni * (j):nugr + ni * (j + 1)])
+
+    ncurf = nugr + 2 * ni * nj
+    nipr = ncurf + ni * nj
+
+    rm = out_data[nipr]
+    zm = out_data[nipr + 1]
+    um = out_data[nipr + 2]
+    rx0 = out_data[nipr + 3]
+    zx0 = out_data[nipr + 4]
+    ux0 = out_data[nipr + 5]
+    up = float(out_data[nipr + 6])
+
+    rxb = out_data[nipr + 7:nipr + 7 + nxb]
+    zxb = out_data[nipr + 7 + nxb:nipr + 7 + 2 * nxb]
+
+    # slen=sum(((rxb(2:nxb)-rxb(1:nxb-1)).^2+(zxb(2:nxb)-zxb(1:nxb-1)).^2).^0.5)
+
+    if show == True:
+        plt.figure(figsize=(5, 8))
+        plt.title(par)
+        plt.xlim(0, 1)
+        plt.ylim(-0.7, 0.7)
+        plt.grid()
+    cs = plt.contour(rgr, zgr, ugr, levels=[up], colors='b')
+    bound = cs.allsegs
+    x = []
+    y = []
+    bound_ind = 0
+    if len(bound[0]) > 1:
+        bound_ind = len(bound[0]) - 1
+    for i in bound[0][bound_ind]:
+        # print(i)
+        x.append(float(i[0]))
+        y.append(float(i[1]))
+    # plt.figure(figsize=(5,8))
+    if show == True:
+        plt.plot(x, y, 'g')
+    '''plt.xlim(0,1)
+    plt.ylim(-0.7, 0.7)
+    plt.grid()'''
+
+    with open(PATH + 'MCC.json', 'r') as file2:
+        mcc_bound = json.load(file2)
+
+    if show == True:
+        plt.plot([i / 100 for i in mcc_bound['r']], [i / 100 for i in mcc_bound['z']], 'r')
+
+    if compare == 'area':
+        diff_x = np.diff(x)
+        diff_y = np.diff(y)
+        area = abs(0.5 * sum([y[i] * diff_x[i] - x[i] * diff_y[i] for i in range(len(x) - 1)]))
+
+        diff_r = np.diff([i / 100 for i in mcc_bound['r']])
+        diff_z = np.diff([i / 100 for i in mcc_bound['z']])
+        area2 = abs(0.5 * sum(
+            [[i / 100 for i in mcc_bound['z']][j] * diff_r[j] - [i / 100 for i in mcc_bound['r']][j] * diff_z[j] for j in
+            range(len(mcc_bound['r']) - 1)]))
+
+        print('-------------------')
+        print(area, area2)
+        print('-------------------')
+        dif_y1 = abs(max(y)) - abs(max([i / 100 for i in mcc_bound['z']]))
+        dif_y2 = abs(min(y)) - abs(min([i / 100 for i in mcc_bound['z']]))
+        '''if show == True:
+            plt.show()'''
+        return area2 - area, (abs(dif_y1) + abs(dif_y2)) / 2
+    elif compare == 'dot':
+        dif_x1 = abs(max(x)) - abs(max([i / 100 for i in mcc_bound['r']]))
+        dif_x2 = abs(min(x)) - abs(min([i / 100 for i in mcc_bound['r']]))
+        dif_y1 = abs(max(y)) - abs(max([i / 100 for i in mcc_bound['z']]))
+        dif_y2 = abs(min(y)) - abs(min([i / 100 for i in mcc_bound['z']]))
+        print('-------------------')
+        print((abs(dif_y1) + abs(dif_y2)) / 2)
+        print(dif_x1, dif_x2)
+        print('-------------------')
+        return (abs(dif_x1) + abs(dif_x2)) / 2, (abs(dif_y1) + abs(dif_y2)) / 2
+    else:
+        print('ERROR')
+        return 0, 0
 
 
+def find_li(li):
+    li_arr = np.loadtxt('li_res.txt')
+    al11_arr = [i / 100 for i in range(60, 120)]
+    al22_arr = [i / 100 for i in range(80, 150)]
+    ind_find = np.where(np.logical_and(li_arr >= li - 0.002, li_arr <= li + 0.002))
+    if max(ind_find[0]) < 30:
+        max_i = max(ind_find[0])
+        ind_0 = np.where(ind_find[0] == max_i)[0]
+    else:
+        ind = np.where((ind_find[0] > 30) & (ind_find[0] < 50))
+        ind_0 = ind[0][int(len(ind[0]) / 2)]
+        print(ind[0][int(len(ind[0]) / 2)])
+    ind1 = ind_find[0][ind_0]
+    ind2 = ind_find[1][ind_0]
+    print('li: ', float(li_arr[ind1, ind2]))
+    return al11_arr[int(ind1)], al22_arr[int(ind2)]
+
+def find_li2(li):
+    alf1 = (li - 0.2 + 0.6) / 2
+    a1 = -0.049
+    a2 = 1.34
+    b11 = 0.41
+    b12 = - 0.944
+    b21 = -0.1345
+    b22 = 0.26
+    alf2 = (li - a1 - b11 * alf1 - b21 * alf1 * alf1) / (a2 + b12 * alf1 + b22 * alf1 * alf1)
+    return alf1, alf2
+
+def find_par(par, Shotn, time, I_coil, betta_po, li, bounds, show2=False):
+    dif_list = []
+    dif_list2 = []
+    min_par = 0
+    minimum = 1000
+    res = {'li': [], 'bp': []}
+    #alf11, alf22 = find_li(li)
+    for change in range(bounds[0], bounds[1], bounds[2]):
+        if par == 'betta_po':
+            betta_po = change / 100
+            print(betta_po)
+        elif par == 'li':
+            alf11, alf22 = find_li(change / 100)
+            print('li_want ', change / 100)
+            print(alf11, alf22)
+        else:
+            print('error!', par)
+            break
+        DURS_upd(Shotn, time, I_coil['Ipl'], betta_po, alf11, alf22)
+
+        try:
+            process = subprocess.Popen(["run.bat"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate(timeout=5)
+            # print('out: ', stdout.decode('utf-8'))
+            result = EVOL_res()
+            if result == -1:
+                print('NOT COUNT')
+                continue
+            dif_x, dif_y = compare_bound(change / 100, show=show2)
+            if par == 'betta_po':
+                dif = dif_y
+            else:
+                dif = dif_x
+            dif_list.append(abs(dif_x))
+            dif_list2.append((dif_y))
+            if par == 'betta_po':
+                print('res: ', result['betpol'])
+            elif par == 'li':
+                print('Li_res: ', result['li'])
+            if minimum > abs(dif):
+                minimum = abs(dif)
+                if par == 'betta_po':
+                    min_par = result['betpol']
+                elif par == 'li':
+                    min_par = result['li']
+            res['li'].append(result['li'])
+            res['bp'].append(result['betpol'])
+        except subprocess.TimeoutExpired:
+            print('time over')
+            subprocess.check_call("TASKKILL /F /PID {pid} /T".format(pid=process.pid))
+        '''print('err: ', stderr.decode('utf-8'))'''
+    print('for %s min dif value %f with par value %f' %(par, minimum, min_par))
+
+
+    if show2 == True:
+        if par == 'betta_po':
+            x = res['bp']
+        elif par == 'li':
+            x = res['li']
+        else:
+            x = [i / 100 for i in range(bounds[0], bounds[0] + len(dif_list))]
+
+        plt.figure()
+        plt.title('x difference')
+        plt.plot(x, dif_list, 'o')
+        plt.grid()
+
+        plt.figure()
+        plt.title('y difference')
+        plt.plot(x, dif_list2, 'o')
+        plt.grid()
+        plt.show()
+
+    return min_par, res
+
+
+def find_par2(par, Shotn, time, I_coil, betta_po, li, bounds, show2=False):
+    dif_list = []
+    dif_list2 = []
+    min_par = 0
+    minimum = 1000
+
+    res = {'li': [], 'bp': []}
+    alf11, alf22 = find_li2(li)
+    for change in range(bounds[0], bounds[1], bounds[2]):
+        if par == 'betta_po':
+            betta_po = change / 100
+            print(betta_po)
+        elif par == 'li':
+            alf11, alf22 = find_li2(change / 100)
+            print('li_want ', change / 100)
+            print(alf11, alf22)
+        else:
+            print('error!', par)
+            break
+        DURS_upd(Shotn, time, I_coil['Ipl'], betta_po, alf11, alf22)
+
+        try:
+            process = subprocess.Popen(["run.bat"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate(timeout=5)
+            result = EVOL_res()
+            if result == -1:
+                print('NOT COUNT')
+                continue
+            if par == 'betta_po':
+                print('res: ', result['betpol'])
+                name = result['betpol']
+            elif par == 'li':
+                print('Li_res: ', result['li'])
+                name = result['li']
+            dif_x, dif_y = compare_bound(name, show=show2)
+            if par == 'betta_po':
+                dif = dif_y
+            else:
+                dif = dif_x
+            dif_list.append(abs(dif_x))
+            dif_list2.append((dif_y))
+            res['li'].append(result['li'])
+            res['bp'].append(result['betpol'])
+            if minimum > abs(dif):
+                minimum = abs(dif)
+                if par == 'betta_po':
+                    min_par = result['betpol']
+                elif par == 'li':
+                    min_par = result['li']
+            else:
+                break
+        except subprocess.TimeoutExpired:
+            print('time over')
+            subprocess.check_call("TASKKILL /F /PID {pid} /T".format(pid=process.pid))
+        '''print('err: ', stderr.decode('utf-8'))'''
+    print('for %s min dif value %f with par value %f' % (par, minimum, min_par))
+
+    if show2 == True:
+        if par == 'betta_po':
+            x = res['bp']
+        elif par == 'li':
+            x = res['li']
+        else:
+            x = [i / 100 for i in range(bounds[0], bounds[0] + len(dif_list))]
+
+        plt.figure()
+        plt.title('x difference')
+        plt.plot(x, dif_list, 'o')
+        plt.grid()
+
+        plt.figure()
+        plt.title('y difference')
+        plt.plot(x, dif_list2, 'o')
+        plt.grid()
+        plt.show()
+
+    return min_par, res
 
 
 
