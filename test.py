@@ -24,3 +24,5 @@ for time in time_list:
     print(time1, time2)
     print(Rc1, Rc2)
     plt.show()
+
+# nothing
