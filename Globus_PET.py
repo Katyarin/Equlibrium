@@ -9,10 +9,12 @@ import json
 import subprocess
 from scipy import interpolate as inter
 import get_TS
+from pathlib import Path
 pi = 3.14159265359
 
 PATH = 'c:/work/equilibrium/Globus_PET/'
 sht_PATH = '//172.16.12.127/Data/sht'
+PATH_res = 'results/'
 
 def smooth(y, box_pts):
     box = np.ones(box_pts)/box_pts
@@ -24,9 +26,19 @@ def get_coils(Shotn, time, shotn_sub=0):
     signals = niifaRipper.extract_niifa('//172.16.12.127/Pub/!!!CURRENT_COIL_METHOD/magn_data/', Shotn)
     print(signals.keys())
 
+
+
     i_need = ['Ipf1', 'Ipf3', 'Ics', 'Ipl', 'Icc', 'Ihfc', 'Ivfc']
 
     signals['Ipf2'] = [0] * len(signals['t_ms'])
+
+    file_curr = Path('currents/' + str(Shotn) + '.txt')
+    if not file_curr.is_file():
+        with file_curr.open(mode='w') as file:
+            file.write('%10s' %'time')
+            for i in i_need:
+                file.write('%10s' %i)
+            file.write('\n')
 
     I_coil = {}
     k = 0
@@ -44,6 +56,11 @@ def get_coils(Shotn, time, shotn_sub=0):
             I_coil[I] = smooth(signals[I], 95)[index_time2] #kA
         else:
             I_coil[I] = signals[I][index_time2] #kA
+    with file_curr.open(mode='a') as file:
+        file.write('%10.4f' % time)
+        for i in i_need:
+            file.write('%10.4f' %I_coil[i])
+        file.write('\n')
     return I_coil
 
 
@@ -163,7 +180,7 @@ def EVOL_res():
                   'Rc': Rc}
         return Result
 
-def compare_bound(par, ax, show=False, curr=False, compare='dot', inside=False, share=False):
+def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', inside=False, share=False):
 
     out_data_raw = []
 
@@ -196,7 +213,7 @@ def compare_bound(par, ax, show=False, curr=False, compare='dot', inside=False, 
             else:
                 line_count += 1
 
-    print(q_data.keys())
+    #print(q_data.keys())
     P_axis = q_data['P'][0]
     out_data = out_data_raw
     for i in range(len(out_data_raw)):
@@ -231,7 +248,7 @@ def compare_bound(par, ax, show=False, curr=False, compare='dot', inside=False, 
             norm_ugr[i].append(j * 8 * pi * pi / 10)
 
     if share:
-        with open('eq_res.txt', 'w') as resfile:
+        with open(PATH_res + str(Shotn) + '_' + str(round(time, 3)) + '_eq_res.txt', 'w') as resfile:
             resfile.write('          ')
             for i, z in enumerate(zgr):
                 resfile.write(' %8.5f ' % z)
@@ -264,7 +281,10 @@ def compare_bound(par, ax, show=False, curr=False, compare='dot', inside=False, 
         ax.set_xlim(0, 1)
         ax.set_ylim(-0.7, 0.7)
         ax.grid()
-    cs = ax.contour(rgr, zgr, ugr, levels=[up], colors='b', alpha=0.1)
+    if show:
+        cs = ax.contour(rgr, zgr, ugr, levels=[up], colors='b', alpha=0.01)
+    else:
+        cs = plt.contour(rgr, zgr, ugr, levels=[up], colors='b', alpha=0.01)
     if inside:
         ax.contour(rgr, zgr, ugr, levels=20, colors='b', alpha=0.1)
     bound = cs.allsegs
@@ -288,7 +308,7 @@ def compare_bound(par, ax, show=False, curr=False, compare='dot', inside=False, 
         ax.plot(x, y, 'g')
 
     if share:
-        with open('bound.txt', 'w') as bndfile:
+        with open(PATH_res + str(Shotn) + '_' + str(round(time, 3)) + '_bound.txt', 'w') as bndfile:
             for i, ri in enumerate(x):
                 bndfile.write(' %8.5f ' % ri)
                 bndfile.write(' %8.5f ' % y[i])
@@ -308,8 +328,10 @@ def compare_bound(par, ax, show=False, curr=False, compare='dot', inside=False, 
     Rvv = float(blanfw[0][0])
     nvv = int(blanfw[1][0])
 
-    ax.plot([float(blanfw[i + 2][1]) for i in range(nvv)], [float(blanfw[i + 2][2]) for i in range(nvv)], 'black')
-    ax.plot([float(blanfw[i + 2][3]) for i in range(nvv)], [float(blanfw[i + 2][4]) for i in range(nvv)], 'black')
+    if show:
+
+        ax.plot([float(blanfw[i + 2][1]) for i in range(nvv)], [float(blanfw[i + 2][2]) for i in range(nvv)], 'black')
+        ax.plot([float(blanfw[i + 2][3]) for i in range(nvv)], [float(blanfw[i + 2][4]) for i in range(nvv)], 'black')
 
     with open(PATH + 'LIMPNT.dat', 'r') as file4:
         limpnt = []
@@ -318,14 +340,15 @@ def compare_bound(par, ax, show=False, curr=False, compare='dot', inside=False, 
 
     nlim = int(limpnt[0][0])
 
-    ax.plot([float(limpnt[i + 1][0]) for i in range(nlim)] + [float(limpnt[1][0])],
-             [float(limpnt[i + 1][1]) for i in range(nlim)] + [float(limpnt[1][1])], 'm')
+    if show:
+        ax.plot([float(limpnt[i + 1][0]) for i in range(nlim)] + [float(limpnt[1][0])],
+                 [float(limpnt[i + 1][1]) for i in range(nlim)] + [float(limpnt[1][1])], 'm')
 
-    ax.scatter(rx0, zx0, marker='x')
-    ax.scatter(rm, zm, marker='x')
+        ax.scatter(rx0, zx0, marker='x')
+        ax.scatter(rm, zm, marker='x')
 
     if share:
-        with open('dots.txt', 'w') as dotfile:
+        with open(PATH_res + str(Shotn) + '_' + str(round(time, 3)) + '_dots.txt', 'w') as dotfile:
             dotfile.write('magnetic axis    ')
             dotfile.write(' %8.5f ' % rm)
             dotfile.write(' %8.5f ' % zm)
@@ -393,7 +416,7 @@ def compare_bound(par, ax, show=False, curr=False, compare='dot', inside=False, 
             if max(q_data['Psi']) > j > min(q_data['Psi']):
                 press[i].append(P_psi(j))
             elif max(q_data['Psi']) < j:
-                press[i].append(max(q_data['Psi']))
+                press[i].append(P_psi(max(q_data['Psi'])))
             else:
                 press[i].append(0)
 
@@ -409,12 +432,40 @@ def compare_bound(par, ax, show=False, curr=False, compare='dot', inside=False, 
     V = np.trapz([v * 2 * pi * rgr[r] for r, v in enumerate(V_prob)], rgr)
     S = np.trapz([v for r, v in enumerate(V_prob)], rgr)
 
+    """q"""
+    q_psi = inter.interp1d(q_data['Psi'], q_data['qplr'], kind='cubic')
+
+    q_q = []
+
+    for i, psi in enumerate(norm_ugr):
+        q_q.append([])
+        for j in psi:
+            if max(q_data['Psi']) > j > min(q_data['Psi']):
+                q_q[i].append(q_psi(j))
+            elif max(q_data['Psi']) < j:
+                q_q[i].append(q_psi(max(q_data['Psi'])))
+            else:
+                q_q[i].append(0)
+
+    if share:
+        with open(PATH_res + str(Shotn) + '_' + str(round(time, 3)) + '_q_res.txt', 'w') as qresfile:
+            qresfile.write('          ')
+            for i, z in enumerate(zgr):
+                qresfile.write(' %8.5f ' % z)
+            qresfile.write('\n')
+            for i, r in enumerate(rgr):
+                qresfile.write(' %8.5f ' % r)
+                for j in range(len(zgr)):
+                    qresfile.write(' %8.5f ' % q_q[i][j])
+                qresfile.write('\n')
 
 
-    print('_________compare bounds______________________________')
+
+
+    '''print('_________compare bounds______________________________')
     print('center: ', rm, zm)
     print('x-dot: ', rx0, zx0)
-    print('x_max = ', max(x))
+    print('x_max = ', max(x))'''
     if compare == 'area':
         diff_x = np.diff(x)
         diff_y = np.diff(y)
@@ -439,10 +490,10 @@ def compare_bound(par, ax, show=False, curr=False, compare='dot', inside=False, 
         dif_x2 = abs(min(x)) - abs(min([i / 100 for i in mcc_bound['r']]))
         dif_y1 = abs(max(y)) - abs(max([i / 100 for i in mcc_bound['z']]))
         dif_y2 = abs(min(y)) - abs(min([i / 100 for i in mcc_bound['z']]))
-        print('-------------------')
+        '''print('-------------------')
         print((abs(dif_y1) + abs(dif_y2)) / 2)
         print(dif_x1, dif_x2)
-        print('-------------------')
+        print('-------------------')'''
         return (abs(dif_x1) + abs(dif_x2)) / 2, (abs(dif_y1)) / 2, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl
     else:
         print('ERROR')
@@ -507,7 +558,7 @@ def find_par(par, Shotn, time, I_coil, betta_po, li, bounds, show2=False, share=
             if result == -1:
                 print('NOT COUNT')
                 continue
-            dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl = compare_bound(change / 100, show=show2, share=share)
+            dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl = compare_bound(Shotn, time, change / 100, show=show2, share=share)
             if par == 'betta_po':
                 dif = dif_y
             else:
@@ -567,21 +618,23 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
     res = {'li': [], 'bp': []}
     alf11, alf22 = find_li2(li)
     k = 0
-    fig = plt.figure()
-    fig.suptitle('t = ' + str(time) + ' bI = ' + str(betta_po))
     pic = 0
-    fig.set_figheight(10)
-    fig.set_figwidth(20)
+    if show2:
+        fig = plt.figure()
+        fig.suptitle('t = ' + str(time) + ' bI = ' + str(betta_po))
+        fig.set_figheight(10)
+        fig.set_figwidth(20)
     if mode == 'sep':
         minimum_delta = 1
         for change in range(bounds[0], bounds[1], bounds[2]):
+            print(change / 100)
             if par == 'betta_po':
                 betta_po = change / 100
-                print(betta_po)
+                #print(betta_po)
             elif par == 'li':
                 alf11, alf22 = find_li2(change / 100)
-                print('li_want ', change / 100)
-                print(alf11, alf22)
+                '''print('li_want ', change / 100)
+                print(alf11, alf22)'''
             else:
                 print('error!', par)
                 break
@@ -592,20 +645,21 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
                 stdout, stderr = process.communicate(timeout=5)
                 result = EVOL_res()
 
-                pic += 1
-                ax = fig.add_subplot(2, 7, pic)
+                if show2:
+                    pic += 1
+                    ax = fig.add_subplot(2, 7, pic)
 
                 if result == -1:
                     print('NOT COUNT')
                     continue
                 if par == 'betta_po':
-                    print('res: ', result['betpol'])
+                    #print('res: ', result['betpol'])
                     name = result['betpol']
                 elif par == 'li':
-                    print('Li_res: ', result['li'])
+                    #print('Li_res: ', result['li'])
                     name = 'li = ' + str(round(result['li'], 2)) + ', bp = ' + str(round(result['betpol'], 2))
                 #ax.set_title(str(name))
-                dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl = compare_bound(name, ax, show=show2)
+                dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl = compare_bound(Shotn, time, name, ax, show=show2)
                 if par == 'betta_po':
                     dif = dif_y
                 else:
@@ -640,13 +694,14 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
         minimum_delta = 100
         while delta_psi > 0.005:
             par_test = round((bnd_e + bnd_s) / 2, 2)
+            print(par_test)
             if par == 'betta_po':
                 betta_po = par_test / 100
-                print(betta_po)
+                #print(betta_po)
             elif par == 'li':
                 alf11, alf22 = find_li2(par_test / 100)
-                print('li_want ', par_test / 100)
-                print(alf11, alf22)
+                '''print('li_want ', par_test / 100)
+                print(alf11, alf22)'''
             else:
                 print('error!', par)
                 break
@@ -656,11 +711,15 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
                 pic += 1
                 print('.................................', betta_po, pic, '.................................')
                 if pic < 11:
-                    ax = fig.add_subplot(3, 7, pic)
+                    if show2:
+                        ax = fig.add_subplot(3, 7, pic)
+                    else:
+                        ax = 0
                 else:
                     print(delta_psi)
                     print('too many steps')
                     break
+
 
 
                 process = subprocess.Popen(["run.bat"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -670,16 +729,16 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
 
 
                 if result == -1:
-                    print('NOT COUNT')
+                    #print('NOT COUNT')
                     continue
                 if par == 'betta_po':
-                    print('res: ', result['betpol'])
+                    #print('res: ', result['betpol'])
                     name = result['betpol']
                 elif par == 'li':
-                    print('Li_res: ', result['li'])
+                    #print('Li_res: ', result['li'])
                     name = 'li = ' + str(round(result['li'], 2)) + ', bp = ' + str(round(result['betpol'], 2))
                 #ax.set_title(str(name))
-                dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl = compare_bound(name, ax, show=show2)
+                dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl = compare_bound(Shotn, time, name, ax, show=show2)
                 if par == 'betta_po':
                     dif = dif_y
                 else:
@@ -695,11 +754,11 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
                 dif_list4.append(delta_psi)
                 '''if dif > 0.02:
                     delta_psi = 0.2'''
-                print('!!!!!!!!!!!!!!!!!')
+                '''print('!!!!!!!!!!!!!!!!!')
                 print(psi_dia_sakh, psi_pet)
                 print(delta_psi)
                 print(bnd_s, bnd_e, par_test)
-                print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')'''
                 if delta_psi < minimum_delta:
                     minimum_delta = delta_psi
                     minimum = abs(dif)
@@ -730,8 +789,9 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
     else:
         print('unknown mode!')
         stop
-    print('for %s min dif value %f with par value %f' % (par, minimum, min_par))
-    pdf.savefig(fig)
+    #print('for %s min dif value %f with par value %f' % (par, minimum, min_par))
+    if show2:
+        pdf.savefig(fig)
 
     if show2 == True:
         if par == 'betta_po':
@@ -795,6 +855,8 @@ def We(Shotn, time, rgr, zgr, norm_ugr, Wi=False):
 
     ne_r = inter.interp1d(rgr, ne_psi, kind='linear')
 
+
+
     TS_press = []
 
 
@@ -817,45 +879,77 @@ def We(Shotn, time, rgr, zgr, norm_ugr, Wi=False):
         W_prob_TS.append(np.trapz([TS_press[r][z] * 1e6 for r in range(len(TS_press))], zgr))
     W_electron = 3 / 2 * np.trapz([W * 2 * pi * rgr[r] for r, W in enumerate(W_prob_TS)], rgr)
     if Wi:
-        if Shotn == 41585:
-            print(round(time, 1))
-            time_li = [192.5, 197.5, 202.5, 207.5, 212.5, 217.6]
-            Ri_li = {1925: [362.24, 392.87, 423.79, 453.28, 481.85, 590],
-                     1975: [362.24, 392.87, 423.79, 453.28, 481.85, 507.67, 532.11, 590],
-                     2025: [362.24, 392.87, 423.79, 453.28, 481.85, 507.67, 590],
-                     2075: [362.24, 392.87, 423.79, 453.28, 481.85, 507.67, 532.11, 590],
-                     2125: [362.24, 392.87, 423.79, 453.28, 481.85, 507.67, 532.11, 590],
-                     2176: [362.24, 392.87, 423.79, 453.28, 481.85, 507.67, 532.11, 590]}
+        Z1 = 1
+        Z2 = 6
+        time_li = []
+        Ri_li = {}
+        Ti_li = {}
+        Ti_err_li = {}
 
-            Ti_li = {1925: [1649.93, 2632.2, 2466.41, 2792.09, 1729.48, 446.85],
-                     1975: [3116.57, 2742.31, 2835.65, 2785.68, 2141.68, 1732.38, 1442.14, 338.48],
-                     2025: [2717.22, 3472.71, 2852.99, 2730.55, 2735.12, 1843.91, 417.06],
-                     2075: [3638.66, 2733.72, 3092.99, 2878.43, 3133.42, 2327.98, 1745.67, 431.2],
-                     2125: [3508.44, 3967.52, 3632.02, 3161.99, 3003.28, 2317.16, 1465.33, 431.52],
-                     2176: [3283.66, 3801.29, 3028.94, 3022.84, 3341.21, 2385.78, 1482.26, 437.73]}
+        try:
+            l = 0
+            with open('c:/work/equilibrium/Ti_data/' + str(Shotn) + '.txt', 'r') as Ti_file:
+                for line in Ti_file:
+                    data = line.split()
+                    if data:
+                        if l == 0:
+                            time_li = [float(data[i]) for i in range(1, len(data), 2)]
+                        elif l == 1:
+                            t = 0
+                            R_local = float(data[0])
+                            for i in range(1, len(data), 2):
+                                if data[i] != 'NaN':
+                                    Ri_li[int(time_li[t] * 10)] = [R_local]
+                                    Ti_li[int(time_li[t] * 10)] = [float(data[i])]
+                                    Ti_err_li[int(time_li[t] * 10)] = [float(data[i+1])]
+                                t+=1
+                        else:
+                            t = 0
+                            #print(data)
+                            R_local = float(data[0])
+                            for i in range(1, len(data), 2):
+                                if data[i] != 'NaN':
+                                    Ri_li[int(time_li[t] * 10)].append(R_local)
+                                    Ti_li[int(time_li[t] * 10)].append(float(data[i]))
+                                    Ti_err_li[int(time_li[t] * 10)].append(float(data[i+1]))
+                                t += 1
+                        l+=1
+                print(time_li)
+                print(Ri_li)
+                print(Ti_li)
 
-            Ti_err_li = {1925: [224.54, 286.33, 278.58, 338.04, 191.08, 177.59],
-                     1975: [231.64, 183.6, 211.33, 192.45, 162.53, 143.35, 245.35, 159.69],
-                     2025: [265.79, 217.6, 255.03, 218.08, 236.77, 165.74, 202.91],
-                     2075: [337.47, 218.67, 220.32, 251.28, 210.48, 222.3, 228.25, 177.18],
-                     2125: [368.69, 380.45, 328.77, 274.03, 275.59, 205.26, 267.59, 172.67],
-                     2176: [489.69, 330.36, 228.03, 402.49, 355.34, 195.08, 226.05, 209.67]}
-
-            if round(time,1) in time_li:
-                Ri = Ri_li[int(round(time*10))]
-                Ti = Ti_li[int(round(time*10))]
-                Ti_err = Ti_err_li[int(round(time*10))]
+            with open('c:/work/equilibrium/Zeff_data/' + str(Shotn) + '_Zeff.txt', 'r') as Zeff_file:
+                Zeff_data = {'time': [], 'data': []}
+                for line in Zeff_file:
+                    data = line.split()
+                    Zeff_data['time'].append(float(data[1]) * 1e3)
+                    Zeff_data['data'].append(float(data[3]))
+            print(Zeff_data)
+            if round(time, 1) in time_li:
+                Ri = Ri_li[int(round(time * 10))]
+                Ti = Ti_li[int(round(time * 10))]
+                # Ti_err = Ti_err_li[int(round(time * 10))]
                 print(Ri, Ti)
+                print('we are here')
                 ni = ne_r([elem / 1000 for elem in Ri])
-                Pi = [Ti[i] * ni[i] * 0.7 * q * 1e-6 for i in range(len(Ri))]
-                Pi_err = [Pi[i] * (Ti_err[i]/Ti[i]) for i in range(len(Ri))]
+                for i, el in enumerate(Zeff_data['time']):
+                    if time - 2.5 < el < time + 2.5:
+                        print(el)
+                        print(Zeff_data['data'][i])
+                        Zeff = Zeff_data['data'][i]
+                print('Zeff:', Zeff)
+                ni_coeff = (Zeff - Z2) / (Z1 * Z1 - Z1 * Z2)
+                print(ni_coeff)
+                Pi = [Ti[i] * ni[i] * ni_coeff * q * 1e-6 for i in range(len(Ri))]
+                # Pi_err = [Pi[i] * (Ti_err[i] / Ti[i]) for i in range(len(Ri))]
 
                 Pi_psi = inter.interp1d(Psi_R_for_TS([elem / 1000 for elem in Ri]), Pi, kind='linear')
                 ion_press = []
                 for i, psi in enumerate(norm_ugr):
                     ion_press.append([])
                     for j in psi:
-                        if max(Psi_R_for_TS([elem / 1000 for elem in Ri])) > j > min(Psi_R_for_TS([elem / 1000 for elem in Ri])):
+                        if max(Psi_R_for_TS([elem / 1000 for elem in Ri])) > j > min(
+                                Psi_R_for_TS([elem / 1000 for elem in Ri])):
                             ion_press[i].append(Pi_psi(j))
                         elif j > max(Psi_R_for_TS([elem / 1000 for elem in Ri])):
                             ion_press[i].append(Pi_psi(max(Psi_R_for_TS([elem / 1000 for elem in Ri]))))
@@ -866,17 +960,14 @@ def We(Shotn, time, rgr, zgr, norm_ugr, Wi=False):
                 for z in range(len(ion_press[0])):
                     W_prob_i.append(np.trapz([ion_press[r][z] * 1e6 for r in range(len(ion_press))], zgr))
                 W_ion = 3 / 2 * np.trapz([W * 2 * pi * rgr[r] for r, W in enumerate(W_prob_i)], rgr)
-                '''plt.figure()
-                plt.plot(rgr, ion_press[js0])
-                plt.scatter([elem / 1000 for elem in Ri], Pi)
-                plt.show()'''
             else:
                 W_ion = 0
-        else:
+        except FileNotFoundError:
             W_ion = 0
+            print('Ti file not found')
+
     else:
         W_ion = 0
-
 
     return W_electron, error, W_ion
 
@@ -897,11 +988,12 @@ def find_bound(Shotn, time, I_coil, betta_I, li, alf1=0, k=0, pdf=None, show2=Tr
             name = '#' + str(Shotn) + ', time = ' + str(time) + ', bI = ' + str(betta_I) + '\n' + 'li = ' + str(round(result['li'], 2)) + ', bp = ' + str(round(result['betpol'], 2))
             fig = plt.figure(figsize=(6,10))
             ax = fig.add_subplot(1,1,1)
-            dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl = compare_bound(name, ax, show=show2, inside=inside, share=share)
+            dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl = compare_bound(Shotn, time, name, ax, show=show2, inside=inside, share=share)
             We_el, error, W_ion = We(Shotn, time, rgr, zgr, norm_ugr, Wi)
+            dif = (abs(dif_x) + abs(dif_y)) / 2
             if pdf:
                 pdf.savefig(fig)
-        return betta_I, str(round(result['li'], 3)), str(round(result['betpol'], 3)), W_all, We_el, V, S, P_axis, li, Ftor_pl, W_ion
+        return betta_I, str(round(result['li'], 3)), str(round(result['betpol'], 3)), W_all, We_el, V, S, P_axis, li, Ftor_pl, W_ion, dif
     except subprocess.TimeoutExpired:
         print('time over')
         subprocess.check_call("TASKKILL /F /PID {pid} /T".format(pid=process.pid))
