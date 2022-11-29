@@ -259,6 +259,17 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
                     resfile.write(' %8.5f ' % norm_ugr[i][j])
                 resfile.write('\n')
 
+        with open(PATH_res + str(Shotn) + '_' + str(round(time, 3)) + '_ipr_res.txt', 'w') as resfile:
+            resfile.write('          ')
+            for i, z in enumerate(zgr):
+                resfile.write(' %8.5f ' % z)
+            resfile.write('\n')
+            for i, r in enumerate(rgr):
+                resfile.write(' %8.5f ' % r)
+                for j in range(len(zgr)):
+                    resfile.write(' %8.5f ' % ipr[i][j])
+                resfile.write('\n')
+
     ncurf = nugr + 2 * ni * nj
     nipr = ncurf + ni * nj
 
@@ -305,7 +316,7 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
         y.append(float(i[1]))
     # plt.figure(figsize=(5,8))
     if show == True:
-        ax.plot(x, y, 'g')
+        ax.plot(x, y, 'g', label='PET')
 
     if share:
         with open(PATH_res + str(Shotn) + '_' + str(round(time, 3)) + '_bound.txt', 'w') as bndfile:
@@ -318,8 +329,8 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
         mcc_bound = json.load(file2)
 
     if show == True:
-        ax.plot([i / 100 for i in mcc_bound['r']], [i / 100 for i in mcc_bound['z']], 'r')
-
+        ax.plot([i / 100 for i in mcc_bound['r']], [i / 100 for i in mcc_bound['z']], 'r', label='MCC')
+        ax.legend()
     with open(PATH + 'BLANFW.DAT', 'r') as file3:
         blanfw = []
         for line in file3:
@@ -364,7 +375,7 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
             zst = abs(zm - zgr[i])
             jst = i
 
-    print(zst, jst)
+    #print(zst, jst)
 
     zst = 1000
     for i in range(len(zgr)):
@@ -372,7 +383,7 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
             zst = abs(0 - zgr[i])
             js0 = i
 
-    print(zst, js0)
+    #print(zst, js0)
 
     k = -1
     curf2 = []
@@ -484,7 +495,7 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
         dif_y2 = abs(min(y)) - abs(min([i / 100 for i in mcc_bound['z']]))
         '''if show == True:
             plt.show()'''
-        return area2 - area, (abs(dif_y1) + abs(dif_y2)) / 2, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl
+        return area2 - area, (abs(dif_y1) + abs(dif_y2)) / 2, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm
     elif compare == 'dot':
         dif_x1 = abs(max(x)) - abs(max([i / 100 for i in mcc_bound['r']]))
         dif_x2 = abs(min(x)) - abs(min([i / 100 for i in mcc_bound['r']]))
@@ -494,7 +505,7 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
         print((abs(dif_y1) + abs(dif_y2)) / 2)
         print(dif_x1, dif_x2)
         print('-------------------')'''
-        return (abs(dif_x1) + abs(dif_x2)) / 2, (abs(dif_y1)) / 2, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl
+        return (abs(dif_x1) + abs(dif_x2)) / 2, (abs(dif_y1)) / 2, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm
     else:
         print('ERROR')
         return 0, 0, [], [], [], 0, 0, 0, 0, 0
@@ -558,7 +569,7 @@ def find_par(par, Shotn, time, I_coil, betta_po, li, bounds, show2=False, share=
             if result == -1:
                 print('NOT COUNT')
                 continue
-            dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl = compare_bound(Shotn, time, change / 100, show=show2, share=share)
+            dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm = compare_bound(Shotn, time, change / 100, show=show2, share=share)
             if par == 'betta_po':
                 dif = dif_y
             else:
@@ -606,7 +617,7 @@ def find_par(par, Shotn, time, I_coil, betta_po, li, bounds, show2=False, share=
     return min_par, res
 
 
-def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=False, how='not_all', psi_dia_sakh=0):
+def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=False, how='not_all', psi_dia_sakh=0, psi_mode = 0):
     dif_list = []
     dif_list2 = []
     dif_list3 = []
@@ -648,6 +659,8 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
                 if show2:
                     pic += 1
                     ax = fig.add_subplot(2, 7, pic)
+                else:
+                    ax = 0
 
                 if result == -1:
                     print('NOT COUNT')
@@ -659,7 +672,7 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
                     #print('Li_res: ', result['li'])
                     name = 'li = ' + str(round(result['li'], 2)) + ', bp = ' + str(round(result['betpol'], 2))
                 #ax.set_title(str(name))
-                dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl = compare_bound(Shotn, time, name, ax, show=show2)
+                dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm = compare_bound(Shotn, time, name, ax, show=show2)
                 if par == 'betta_po':
                     dif = dif_y
                 else:
@@ -669,8 +682,11 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
                 dif_list3.append(dif)
                 res['li'].append(result['li'])
                 res['bp'].append(result['betpol'])
+                psi_pet = Ftor_pl * 1000
+                delta_psi = abs(psi_dia_sakh - psi_pet)
                 if minimum > abs(dif):
                     minimum = abs(dif)
+                    minimum_delta = delta_psi
                     if par == 'betta_po':
                         min_par = result['betpol']
                     elif par == 'li':
@@ -692,7 +708,10 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
         bnd_e = bounds[1]
         delta_psi = 1
         minimum_delta = 100
-        while delta_psi > 0.005:
+        ground_psi = 0.005
+        if psi_mode:
+            ground_psi = 0.05
+        while delta_psi > ground_psi:
             par_test = round((bnd_e + bnd_s) / 2, 2)
             print(par_test)
             if par == 'betta_po':
@@ -738,7 +757,7 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
                     #print('Li_res: ', result['li'])
                     name = 'li = ' + str(round(result['li'], 2)) + ', bp = ' + str(round(result['betpol'], 2))
                 #ax.set_title(str(name))
-                dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl = compare_bound(Shotn, time, name, ax, show=show2)
+                dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm = compare_bound(Shotn, time, name, ax, show=show2)
                 if par == 'betta_po':
                     dif = dif_y
                 else:
@@ -826,19 +845,34 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
     return min_par, min_par_want, res, minimum_delta, minimum
 
 
-def We(Shotn, time, rgr, zgr, norm_ugr, Wi=False):
+def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
     q = 1.602176634e-19
     time = time * 1e3
-    R, Te, ne, P, error = get_TS.get_data(Shotn, time)  # tomson data
+    try:
+        R, Te, ne_raw, P, error = get_TS.get_data(Shotn, time)  # tomson data
+    except:
+        return 0,0,0,0
+    P_TS_raw = [i * 1e-6 for i in P['P']]
+    R_TS_raw = [i / 1000 for i in R]
+    ne = {'ne': [], 'err': []}
 
-    P_TS = [i * 1e-6 for i in P['P']]
-    R_TS = [i / 1000 for i in R]
+    ind_max_for_prof = len(R_TS_raw)
+
+    for i, rr in enumerate(R_TS_raw):
+        if rr > r_axis - 0.02:
+            ind_max_for_prof = i+1
+
+    P_TS = P_TS_raw[:ind_max_for_prof]
+    R_TS = R_TS_raw[:ind_max_for_prof]
+    ne['ne'] = ne_raw['ne'][:ind_max_for_prof]
+
     zst = 1000
     for i in range(len(zgr)):
         if zst > abs(0 - zgr[i]):
             zst = abs(0 - zgr[i])
             js0 = i
     Psi_R_for_TS = inter.interp1d(rgr, norm_ugr[js0], kind='cubic')
+    Psi_R_for_TS_raw = inter.interp1d(rgr, norm_ugr[js0], kind='cubic')
 
     P_TS_psi = inter.interp1d(Psi_R_for_TS(R_TS), P_TS, kind='linear')
 
@@ -855,7 +889,17 @@ def We(Shotn, time, rgr, zgr, norm_ugr, Wi=False):
 
     ne_r = inter.interp1d(rgr, ne_psi, kind='linear')
 
+    ne_all_psi = []
 
+    for i, psi in enumerate(norm_ugr):
+        ne_all_psi.append([])
+        for j in psi:
+            if max(Psi_R_for_TS(R_TS)) > j > min(Psi_R_for_TS(R_TS)):
+                ne_all_psi[i].append(ne_TS_psi(j))
+            elif j > max(Psi_R_for_TS(R_TS)):
+                ne_all_psi[i].append(ne_TS_psi(max(Psi_R_for_TS(R_TS))))
+            else:
+                ne_all_psi[i].append(0)
 
     TS_press = []
 
@@ -869,15 +913,30 @@ def We(Shotn, time, rgr, zgr, norm_ugr, Wi=False):
                 TS_press[i].append(P_TS_psi(max(Psi_R_for_TS(R_TS))))
             else:
                 TS_press[i].append(0)
+    plt.figure()
+    plt.plot(rgr, TS_press[js0], label='electron')
+    plt.scatter(R_TS_raw, P_TS_raw, label='TS')
+    plt.vlines(r_axis, min(P_TS_raw), max(P_TS_raw)*1.2, color='black')
 
-    '''with open(str(Shotn) + '/' + str(time) + '_TS_press.json', 'w') as ts_file:
+    '''with open(str(Shotn) + '_' + str(time) + '_TS_press.json', 'w') as ts_file:
         for_wr = {'Pressure': [float(i) for i in TS_press[js0]], 'R': rgr, 'TS_data':
-            {'R': R_TS, 'P_TS': P_TS}}
+            {'R': R_TS, 'P_TS': P_TS, 'P_err': [i * 1e-6 for i in P['err']]}}
         json.dump(for_wr, ts_file)'''
     W_prob_TS = []
+    ne_prob_TS = []
+
+    V_prob = []
+    for z in range(len(ipr[0])):
+        V_prob.append(np.trapz([ipr[r][z] for r in range(len(ipr))], zgr))
+    V = np.trapz([v * 2 * pi * rgr[r] for r, v in enumerate(V_prob)], rgr)
+
     for z in range(len(TS_press[0])):
-        W_prob_TS.append(np.trapz([TS_press[r][z] * 1e6 for r in range(len(TS_press))], zgr))
+        W_prob_TS.append(np.trapz([TS_press[r][z] * ipr[r][z]  * 1e6 for r in range(len(TS_press))], zgr))
+        ne_prob_TS.append(np.trapz([ne_all_psi[r][z] * ipr[r][z] for r in range(len(TS_press))], zgr))
     W_electron = 3 / 2 * np.trapz([W * 2 * pi * rgr[r] for r, W in enumerate(W_prob_TS)], rgr)
+    ne_av = np.trapz([n * 2 * pi * rgr[r] for r, n in enumerate(ne_prob_TS)], rgr) / V
+
+    #print('average_ne: ', ne_av)
     if Wi:
         Z1 = 1
         Z2 = 6
@@ -902,6 +961,10 @@ def We(Shotn, time, rgr, zgr, norm_ugr, Wi=False):
                                     Ri_li[int(time_li[t] * 10)] = [R_local]
                                     Ti_li[int(time_li[t] * 10)] = [float(data[i])]
                                     Ti_err_li[int(time_li[t] * 10)] = [float(data[i+1])]
+                                else:
+                                    Ri_li[int(time_li[t] * 10)] = []
+                                    Ti_li[int(time_li[t] * 10)] = []
+                                    Ti_err_li[int(time_li[t] * 10)] = []
                                 t+=1
                         else:
                             t = 0
@@ -914,9 +977,9 @@ def We(Shotn, time, rgr, zgr, norm_ugr, Wi=False):
                                     Ti_err_li[int(time_li[t] * 10)].append(float(data[i+1]))
                                 t += 1
                         l+=1
-                print(time_li)
+                '''print(time_li)
                 print(Ri_li)
-                print(Ti_li)
+                print(Ti_li)'''
 
             with open('c:/work/equilibrium/Zeff_data/' + str(Shotn) + '_Zeff.txt', 'r') as Zeff_file:
                 Zeff_data = {'time': [], 'data': []}
@@ -924,23 +987,31 @@ def We(Shotn, time, rgr, zgr, norm_ugr, Wi=False):
                     data = line.split()
                     Zeff_data['time'].append(float(data[1]) * 1e3)
                     Zeff_data['data'].append(float(data[3]))
-            print(Zeff_data)
+            #print(Zeff_data)
             if round(time, 1) in time_li:
-                Ri = Ri_li[int(round(time * 10))]
-                Ti = Ti_li[int(round(time * 10))]
+                Ri_raw = Ri_li[int(round(time * 10))]
+                Ti_raw = Ti_li[int(round(time * 10))]
+                ind_max_for_prof_i = 0
+                for i, rr in enumerate(Ri_raw):
+                    if rr/1000 < r_axis - 0.010:
+                        ind_max_for_prof_i = i+1
+                Ri = Ri_raw[ind_max_for_prof_i:]
+                Ti = Ti_raw[ind_max_for_prof_i:]
                 # Ti_err = Ti_err_li[int(round(time * 10))]
-                print(Ri, Ti)
-                print('we are here')
+                '''print(Ri, Ti)
+                print('we are here')'''
                 ni = ne_r([elem / 1000 for elem in Ri])
+                ni_raw = ne_r([elem / 1000 for elem in Ri_raw])
                 for i, el in enumerate(Zeff_data['time']):
                     if time - 2.5 < el < time + 2.5:
-                        print(el)
-                        print(Zeff_data['data'][i])
+                        '''print(el)
+                        print(Zeff_data['data'][i])'''
                         Zeff = Zeff_data['data'][i]
-                print('Zeff:', Zeff)
+                #print('Zeff:', Zeff)
                 ni_coeff = (Zeff - Z2) / (Z1 * Z1 - Z1 * Z2)
-                print(ni_coeff)
+                #print(ni_coeff)
                 Pi = [Ti[i] * ni[i] * ni_coeff * q * 1e-6 for i in range(len(Ri))]
+                Pi_raw = [Ti_raw[i] * ni_raw[i] * ni_coeff * q * 1e-6 for i in range(len(Ri_raw))]
                 # Pi_err = [Pi[i] * (Ti_err[i] / Ti[i]) for i in range(len(Ri))]
 
                 Pi_psi = inter.interp1d(Psi_R_for_TS([elem / 1000 for elem in Ri]), Pi, kind='linear')
@@ -956,20 +1027,41 @@ def We(Shotn, time, rgr, zgr, norm_ugr, Wi=False):
                         else:
                             ion_press[i].append(0)
 
+                plt.plot(rgr, ion_press[js0], label='ion')
+                plt.scatter([elem / 1000 for elem in Ri_raw], Pi_raw, label='CXRS')
+                plt.legend()
+                plt.grid()
+                plt.ylim(0, max(Pi_raw)*1.2)
+                plt.savefig('el_ion_prof/' + str(Shotn) + '_' + str(time) + '.png')
+
                 W_prob_i = []
                 for z in range(len(ion_press[0])):
-                    W_prob_i.append(np.trapz([ion_press[r][z] * 1e6 for r in range(len(ion_press))], zgr))
+                    W_prob_i.append(np.trapz([ion_press[r][z] * ipr[r][z]  * 1e6 for r in range(len(ion_press))], zgr))
                 W_ion = 3 / 2 * np.trapz([W * 2 * pi * rgr[r] for r, W in enumerate(W_prob_i)], rgr)
             else:
+                plt.legend()
+                plt.grid()
+                plt.ylim(0, max(P_TS_raw) * 1.2)
+                plt.savefig('el_ion_prof/' + str(Shotn) + '_' + str(time) + '.png')
+                W_ion = 0
+                print('Ti file not found')
                 W_ion = 0
         except FileNotFoundError:
+            plt.legend()
+            plt.grid()
+            plt.ylim(0, max(P_TS_raw) * 1.2)
+            plt.savefig('el_ion_prof/' + str(Shotn) + '_' + str(time) + '.png')
             W_ion = 0
             print('Ti file not found')
 
     else:
+        plt.legend()
+        plt.grid()
+        plt.ylim(0, max(P_TS_raw) * 1.2)
+        plt.savefig('el_ion_prof/' + str(Shotn) + '_' + str(time) + '.png')
         W_ion = 0
 
-    return W_electron, error, W_ion
+    return W_electron, error, W_ion, ne_av
 
 def find_bound(Shotn, time, I_coil, betta_I, li, alf1=0, k=0, pdf=None, show2=True, inside=False, Wi=False, share=False):
     alf11, alf22 = find_li2(li, alf1=alf1)
@@ -988,12 +1080,12 @@ def find_bound(Shotn, time, I_coil, betta_I, li, alf1=0, k=0, pdf=None, show2=Tr
             name = '#' + str(Shotn) + ', time = ' + str(time) + ', bI = ' + str(betta_I) + '\n' + 'li = ' + str(round(result['li'], 2)) + ', bp = ' + str(round(result['betpol'], 2))
             fig = plt.figure(figsize=(6,10))
             ax = fig.add_subplot(1,1,1)
-            dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl = compare_bound(Shotn, time, name, ax, show=show2, inside=inside, share=share)
-            We_el, error, W_ion = We(Shotn, time, rgr, zgr, norm_ugr, Wi)
+            dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm = compare_bound(Shotn, time, name, ax, show=show2, inside=inside, share=share)
+            We_el, error, W_ion, ne_av = We(Shotn, time, rgr, zgr, norm_ugr, ipr, rm, Wi)
             dif = (abs(dif_x) + abs(dif_y)) / 2
             if pdf:
                 pdf.savefig(fig)
-        return betta_I, str(round(result['li'], 3)), str(round(result['betpol'], 3)), W_all, We_el, V, S, P_axis, li, Ftor_pl, W_ion, dif
+        return betta_I, str(round(result['li'], 3)), str(round(result['betpol'], 3)), W_all, We_el, V, S, P_axis, li, Ftor_pl, W_ion, dif, ne_av
     except subprocess.TimeoutExpired:
         print('time over')
         subprocess.check_call("TASKKILL /F /PID {pid} /T".format(pid=process.pid))
