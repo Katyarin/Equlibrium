@@ -290,7 +290,7 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
         #plt.figure(figsize=(5, 8))
         ax.set_title(par)
         ax.set_xlim(0, 1)
-        ax.set_ylim(-0.7, 0.7)
+        ax.set_ylim(-0.8, 0.8)
         ax.grid()
     if show:
         cs = ax.contour(rgr, zgr, ugr, levels=[up], colors='b', alpha=0.01)
@@ -317,6 +317,8 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
     # plt.figure(figsize=(5,8))
     if show == True:
         ax.plot(x, y, 'g', label='PET')
+
+
 
     if share:
         with open(PATH_res + str(Shotn) + '_' + str(round(time, 3)) + '_bound.txt', 'w') as bndfile:
@@ -350,7 +352,29 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
             limpnt.append(line.split())
 
     nlim = int(limpnt[0][0])
+    r_lim = [float(limpnt[i + 1][0]) for i in range(nlim)] + [float(limpnt[1][0])]
+    z_lim = [float(limpnt[i + 1][1]) for i in range(nlim)] + [float(limpnt[1][1])]
 
+    strike_point = {'inner': [], 'outer': []}
+    if min(y) < zx0:
+        for j, ind in enumerate([len(x) - 1, 0]):
+            for i in range(len(r_lim)):
+                if r_lim[i] > x[ind] and r_lim[i + 1] < x[ind]:
+                    k2, b2 = np.polyfit(r_lim[i:i + 2], z_lim[i:i + 2], 1)
+            print(k2, b2)
+
+            if j:
+                ind_first = 0
+                ind_last = ind + 6
+            else:
+                ind_first = ind - 5
+                ind_last = ind + 1
+            k1, b1 = np.polyfit(x[ind_first:ind_last], y[ind_first:ind_last], 1)
+
+            strike_point[list(strike_point.keys())[j]].extend([(b1 - b2) / (k2 - k1), (k2 * b1 - k1 * b2) / (k2 - k1)])
+    else:
+        for j in range(2):
+            strike_point[list(strike_point.keys())[j]].extend([-1000,-1000])
     if show:
         ax.plot([float(limpnt[i + 1][0]) for i in range(nlim)] + [float(limpnt[1][0])],
                  [float(limpnt[i + 1][1]) for i in range(nlim)] + [float(limpnt[1][1])], 'm')
@@ -495,7 +519,7 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
         dif_y2 = abs(min(y)) - abs(min([i / 100 for i in mcc_bound['z']]))
         '''if show == True:
             plt.show()'''
-        return area2 - area, (abs(dif_y1) + abs(dif_y2)) / 2, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm
+        return area2 - area, (abs(dif_y1) + abs(dif_y2)) / 2, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm, strike_point
     elif compare == 'dot':
         dif_x1 = abs(max(x)) - abs(max([i / 100 for i in mcc_bound['r']]))
         dif_x2 = abs(min(x)) - abs(min([i / 100 for i in mcc_bound['r']]))
@@ -505,10 +529,10 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
         print((abs(dif_y1) + abs(dif_y2)) / 2)
         print(dif_x1, dif_x2)
         print('-------------------')'''
-        return (abs(dif_x1) + abs(dif_x2)) / 2, (abs(dif_y1)) / 2, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm
+        return (abs(dif_x1) + abs(dif_x2)) / 2, (abs(dif_y1)) / 2, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm, strike_point
     else:
         print('ERROR')
-        return 0, 0, [], [], [], 0, 0, 0, 0, 0
+        return 0, 0, [], [], [], 0, 0, 0, 0, 0, {}
 
 def find_li(li):
     li_arr = np.loadtxt('li_res.txt')
@@ -569,7 +593,7 @@ def find_par(par, Shotn, time, I_coil, betta_po, li, bounds, show2=False, share=
             if result == -1:
                 print('NOT COUNT')
                 continue
-            dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm = compare_bound(Shotn, time, change / 100, show=show2, share=share)
+            dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm, strike_point = compare_bound(Shotn, time, change / 100, show=show2, share=share)
             if par == 'betta_po':
                 dif = dif_y
             else:
@@ -672,7 +696,7 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
                     #print('Li_res: ', result['li'])
                     name = 'li = ' + str(round(result['li'], 2)) + ', bp = ' + str(round(result['betpol'], 2))
                 #ax.set_title(str(name))
-                dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm = compare_bound(Shotn, time, name, ax, show=show2)
+                dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm, strike_point = compare_bound(Shotn, time, name, ax, show=show2)
                 if par == 'betta_po':
                     dif = dif_y
                 else:
@@ -757,7 +781,7 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
                     #print('Li_res: ', result['li'])
                     name = 'li = ' + str(round(result['li'], 2)) + ', bp = ' + str(round(result['betpol'], 2))
                 #ax.set_title(str(name))
-                dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm = compare_bound(Shotn, time, name, ax, show=show2)
+                dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm, strike_point = compare_bound(Shotn, time, name, ax, show=show2)
                 if par == 'betta_po':
                     dif = dif_y
                 else:
@@ -1080,12 +1104,12 @@ def find_bound(Shotn, time, I_coil, betta_I, li, alf1=0, k=0, pdf=None, show2=Tr
             name = '#' + str(Shotn) + ', time = ' + str(time) + ', bI = ' + str(betta_I) + '\n' + 'li = ' + str(round(result['li'], 2)) + ', bp = ' + str(round(result['betpol'], 2))
             fig = plt.figure(figsize=(6,10))
             ax = fig.add_subplot(1,1,1)
-            dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm = compare_bound(Shotn, time, name, ax, show=show2, inside=inside, share=share)
+            dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm, strike_point = compare_bound(Shotn, time, name, ax, show=show2, inside=inside, share=share)
             We_el, error, W_ion, ne_av = We(Shotn, time, rgr, zgr, norm_ugr, ipr, rm, Wi)
             dif = (abs(dif_x) + abs(dif_y)) / 2
             if pdf:
                 pdf.savefig(fig)
-        return betta_I, str(round(result['li'], 3)), str(round(result['betpol'], 3)), W_all, We_el, V, S, P_axis, li, Ftor_pl, W_ion, dif, ne_av
+        return betta_I, str(round(result['li'], 3)), str(round(result['betpol'], 3)), W_all, We_el, V, S, P_axis, li, Ftor_pl, W_ion, dif, ne_av, strike_point
     except subprocess.TimeoutExpired:
         print('time over')
         subprocess.check_call("TASKKILL /F /PID {pid} /T".format(pid=process.pid))

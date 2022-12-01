@@ -6,16 +6,17 @@ import matplotlib.pyplot as plt
 import time as t
 from matplotlib.backends.backend_pdf import PdfPages
 
-tomorow = '221122'
-date_of_culc = '221122'
+tomorow = '221201'
+date_of_culc = '221201'
 Path_res = 'results/'
 
-Shotn = 42492
+Shotn = 42567
 mode = 'psi' #'sep' or 'psi'
 
 pi = 3.14159265359
 mu0 = 4*pi*1e-7
 PATH = 'c:/work/equilibrium/Globus_PET/'
+path_res = 'eq_results/%s/' %Shotn
 
 dia_data = {}
 try:
@@ -80,7 +81,7 @@ Bt = dia_data['Bt']
 culc_data = {}
 data_name = []
 l1 = 0
-with open('test_' + date_of_culc + 'res_' + str(Shotn) + '.txt', 'r') as res_file:
+with open(path_res + 'test_' + date_of_culc + 'res_' + str(Shotn) + '.txt', 'r') as res_file:
     for line in res_file:
         if l1 == 0:
             for data_key in line.split():
@@ -94,9 +95,9 @@ print(culc_data)
 time_list = culc_data['time']
 betta_I_list = culc_data['beta_I']
 li_list = culc_data['li_code']
-pdf_file = PdfPages(str(Shotn) + '_second_plots.pdf')
+pdf_file = PdfPages(path_res + tomorow + '_' + str(Shotn) + '_second_plots.pdf')
 
-with open('test_' + tomorow + 'res_2_' + str(Shotn) + '.txt', 'a') as res_file:
+with open(path_res + 'test_' + tomorow + 'res_2_' + str(Shotn) + '.txt', 'a') as res_file:
     res_file.write('%8s' % 'time')
     res_file.write('%8s' % 'beta_I')
     res_file.write('%8s' % 'beta_p')
@@ -120,6 +121,10 @@ with open('test_' + tomorow + 'res_2_' + str(Shotn) + '.txt', 'a') as res_file:
     res_file.write('%8s' % 'k')
     res_file.write('%8s' % 'tr_up')
     res_file.write('%8s' % 'tr_down')
+    res_file.write('%14s' % 'r_sp_in')
+    res_file.write('%14s' % 'z_sp_in')
+    res_file.write('%14s' % 'r_sp_out')
+    res_file.write('%14s' % 'z_sp_out')
     res_file.write('\n')
 
 for ind, time in enumerate(time_list):
@@ -141,7 +146,7 @@ for ind, time in enumerate(time_list):
     li_acc2 = li_list[ind]
 
     Globus_PET.COIL_upd(Shotn, time, I_coil, Bt[ind])
-    b_I, li_3, bp, W_all, We, V, S, P_axis, li_code, Ftor_pl, Wi, bounds_delta_res, ne_av = Globus_PET.find_bound(Shotn,
+    b_I, li_3, bp, W_all, We, V, S, P_axis, li_code, Ftor_pl, Wi, bounds_delta_res, ne_av, strike_point = Globus_PET.find_bound(Shotn,
                                                                                                                   time,
                                                                                                                   I_coil,
                                                                                                                   betta_I,
@@ -183,7 +188,7 @@ for ind, time in enumerate(time_list):
     k = b/a
     tr_up = (R-r_low) /a
     tr_down = (R-r_up) /a
-    with open('test_' + tomorow + 'res_2_' + str(Shotn) + '.txt', 'a') as res_file:
+    with open(path_res + 'test_' + tomorow + 'res_2_' + str(Shotn) + '.txt', 'a') as res_file:
         res_file.write('%8.4f' % time)
         res_file.write('%8.4f' % float(betta_I))
         res_file.write('%8.4f' % float(bp))
@@ -207,6 +212,10 @@ for ind, time in enumerate(time_list):
         res_file.write('%8.4f' % k)
         res_file.write('%8.4f' % tr_up)
         res_file.write('%8.4f' % tr_down)
+        res_file.write('%14.4f' % strike_point['inner'][0])
+        res_file.write('%14.4f' % strike_point['inner'][1])
+        res_file.write('%14.4f' % strike_point['outer'][0])
+        res_file.write('%14.4f' % strike_point['outer'][1])
         res_file.write('\n')
 
 pdf_file.close()
