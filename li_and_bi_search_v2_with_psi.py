@@ -10,7 +10,7 @@ import os
 
 #this test for search equlibrium with beta and li
 
-tomorow = '221201'
+tomorow = '221202_2'
 
 Shotn = 42567
 mode_start = 'psi' #'sep' or 'psi'
@@ -195,7 +195,9 @@ for ind in range(index_start, index_end):
     psi_delta = 1
     bounds_delta = 1
     attempt = 0
-    while (psi_delta**2 + bounds_delta**2)**0.5 > 0.0065:
+    min_count = 0
+    min_delta = 100
+    while psi_delta > 0.005 or bounds_delta > 0.005:
         if attempt % 2 and attempt < 10:
             betta_I = beta_0 - (attempt%2 + attempt//2) * 0.01
         else:
@@ -210,14 +212,22 @@ for ind in range(index_start, index_end):
         li_work_one_time.append(li_f2)
         psi_delta_for_one_time.append(psi_delta)
         bounds_delta_for_one_time.append(bounds_delta)
-        if attempt<10:
+        print('res of attempt: ', psi_delta, bounds_delta)
+        if bounds_delta < min_delta:
+            min_delta = bounds_delta
+            min_count = 0
+        else:
+            min_count +=1
+
+
+        if attempt<10 and min_count<4:
             attempt+=1
-        elif attempt<30:
+        elif attempt<30 and min_count<4:
             attempt+=2
         else:
             break
-    '''pdf_file.close()
-    plt.figure()
+    #pdf_file.close()
+    '''plt.figure()
     plt.plot(bI_for_one_time, psi_delta_for_one_time)
     plt.grid()
     plt.ylabel('delta_psi')
@@ -247,7 +257,7 @@ for ind in range(index_start, index_end):
     print(bounds_delta_for_one_time[ind_min], psi_delta_for_one_time[ind_min])
     betta_I = bI_for_one_time[ind_min]
     li_acc2 = li_work_one_time[ind_min]
-    b_I, li_3, bp, W_all, We, V, S, P_axis, li_code, Ftor_pl, Wi, bounds_delta_res, ne_av, strike_point = Globus_PET.find_bound(Shotn, time, I_coil, betta_I, li_acc2, 0, 1, pdf = pdf_file,
+    b_I, li_3, bp, W_all, We, V, S, P_axis, li_code, Ftor_pl, Wi, bounds_delta_res, ne_av, strike_point, q95 = Globus_PET.find_bound(Shotn, time, I_coil, betta_I, li_acc2, 0, 1, pdf = pdf_file,
                                                                         inside=True, Wi=True, share=True)
     #plt.show()
     #print('real li: ', res['li'])

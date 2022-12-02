@@ -9,7 +9,7 @@ Path_res = 'results/'
 PATH = 'c:/work/equilibrium/Globus_PET/'
 
 Shotn = 42567
-time = 210 #ms
+time = 165 #ms
 
 z_need = 0
 
@@ -120,29 +120,6 @@ plt.plot([float(blanfw[i + 2][3]) for i in range(nvv)], [float(blanfw[i + 2][4])
 r_lim = [float(limpnt[i + 1][0]) for i in range(nlim)] + [float(limpnt[1][0])]
 z_lim = [float(limpnt[i + 1][1]) for i in range(nlim)] + [float(limpnt[1][1])]
 plt.plot(r_lim, z_lim, 'mo-')
-
-strike_point = {'inner': [], 'outer': []}
-if min(zb) < dots['x-dot'][1]:
-    for j, ind in enumerate([len(rb)-1, 0]):
-        for i in range(len(r_lim)):
-            if r_lim[i] > rb[ind] and r_lim[i+ 1] < rb[ind]:
-                k2, b2 = np.polyfit(r_lim[i:i+2], z_lim[i:i+2], 1)
-        print(k2, b2)
-
-        if j:
-            ind_first = 0
-            ind_last = ind+6
-        else:
-            ind_first = ind - 5
-            ind_last = ind+1
-        k1, b1 = np.polyfit(rb[ind_first:ind_last], zb[ind_first:ind_last], 1)
-
-        strike_point[list(strike_point.keys())[j]].extend([(b1-b2)/(k2-k1), (k2*b1-k1*b2)/(k2-k1)])
-
-
-
-
-
 
 print(zgr.index(0))
 

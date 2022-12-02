@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import time as t
 from matplotlib.backends.backend_pdf import PdfPages
 
-tomorow = '221201'
-date_of_culc = '221201'
+tomorow = '221202'
+date_of_culc = '221202_2'
 Path_res = 'results/'
 
 Shotn = 42567
@@ -125,6 +125,7 @@ with open(path_res + 'test_' + tomorow + 'res_2_' + str(Shotn) + '.txt', 'a') as
     res_file.write('%14s' % 'z_sp_in')
     res_file.write('%14s' % 'r_sp_out')
     res_file.write('%14s' % 'z_sp_out')
+    res_file.write('%14s' % 'q95')
     res_file.write('\n')
 
 for ind, time in enumerate(time_list):
@@ -146,7 +147,7 @@ for ind, time in enumerate(time_list):
     li_acc2 = li_list[ind]
 
     Globus_PET.COIL_upd(Shotn, time, I_coil, Bt[ind])
-    b_I, li_3, bp, W_all, We, V, S, P_axis, li_code, Ftor_pl, Wi, bounds_delta_res, ne_av, strike_point = Globus_PET.find_bound(Shotn,
+    b_I, li_3, bp, W_all, We, V, S, P_axis, li_code, Ftor_pl, Wi, bounds_delta_res, ne_av, strike_point, q95 = Globus_PET.find_bound(Shotn,
                                                                                                                   time,
                                                                                                                   I_coil,
                                                                                                                   betta_I,
@@ -216,6 +217,7 @@ for ind, time in enumerate(time_list):
         res_file.write('%14.4f' % strike_point['inner'][1])
         res_file.write('%14.4f' % strike_point['outer'][0])
         res_file.write('%14.4f' % strike_point['outer'][1])
+        res_file.write('%14.4f' % q95)
         res_file.write('\n')
 
 pdf_file.close()
