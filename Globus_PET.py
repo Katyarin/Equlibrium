@@ -22,15 +22,16 @@ def smooth(y, box_pts):
     return y_smooth
 
 
-def get_coils(Shotn, time, shotn_sub=0):
-    signals = niifaRipper.extract_niifa('//172.16.12.127/Pub/!!!CURRENT_COIL_METHOD/magn_data/', Shotn)
+def get_coils(Shotn, time, shotn_sub: int=0, path: str='/'):
+    print('//172.16.12.127/Pub/!!!CURRENT_COIL_METHOD/magn_data%s' %path)
+    signals = niifaRipper.extract_niifa('//172.16.12.127/Pub/!!!CURRENT_COIL_METHOD/magn_data%s' %path, Shotn)
     print(signals.keys())
 
 
 
-    i_need = ['Ipf1', 'Ipf3', 'Ics', 'Ipl', 'Icc', 'Ihfc', 'Ivfc']
+    i_need = ['Ipf1', 'Ipf2', 'Ipf3', 'Ics', 'Ipl', 'Icc', 'Ihfc', 'Ivfc']
 
-    signals['Ipf2'] = [0] * len(signals['t_ms'])
+    #signals['Ipf2'] = [0] * len(signals['t_ms'])
 
     file_curr = Path('currents/' + str(Shotn) + '.txt')
     if not file_curr.is_file():
@@ -90,7 +91,7 @@ def DURS_upd(Shotn, time, Ip, betta_po, alf11, alf22):
                     file2.write(' %s' % line[element])
             file2.write('\n')
 
-    print('DURS.DAT updated')
+    #print('DURS.DAT updated')
 
 
 def COIL_upd(Shotn, time, I_coil, Bt):
@@ -123,6 +124,9 @@ def COIL_upd(Shotn, time, I_coil, Bt):
 
     for i in [3, 5]:
         COIL_new[i][6] = I_coil['Ipf1'] * 1e-3
+
+    for i in [8, 10]:
+        COIL_new[i][6] = I_coil['Ipf2'] * 1e-3
 
     for i in [13, 15]:
         COIL_new[i][6] = I_coil['Ipf3'] * 1e-3
@@ -310,7 +314,7 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
                 max_bound = len(bound[0][i])
                 index_max = i
         bound_ind = index_max
-    print(bound_ind)
+    #print(bound_ind)
     for i in bound[0][bound_ind]:
         # print(i)
         x.append(float(i[0]))
@@ -358,12 +362,12 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
     z_lim = [float(limpnt[i + 1][1]) for i in range(nlim)] + [float(limpnt[1][1])]
 
     strike_point = {'inner': [], 'outer': []}
-    if min(y) < zx0:
+    if abs(min(y))- abs(zx0) > 0.005:
         for j, ind in enumerate([len(x) - 1, 0]):
-            for i in range(len(r_lim)):
+            for i in range(len(r_lim)-1):
                 if r_lim[i] > x[ind] and r_lim[i + 1] < x[ind]:
                     k2, b2 = np.polyfit(r_lim[i:i + 2], z_lim[i:i + 2], 1)
-            print(k2, b2)
+            #print(k2, b2)
 
             if j:
                 ind_first = 0
@@ -475,8 +479,11 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
     q_psi = inter.interp1d(q_data['Psi'], q_data['qplr'], kind='cubic')
 
     q_q = []
-
-    q_95 = q_psi(up* 8 * pi * pi / 10 *0.95)
+    try:
+        q_95 = q_psi(up* 8 * pi * pi / 10 *1.05)
+    except ValueError:
+        #print(max(q_data['Psi']),min(q_data['Psi']), up * 8 * pi * pi / 10)
+        q_95 = q_psi(up * 8 * pi * pi / 10 * 0.95)
 
 
     for i, psi in enumerate(norm_ugr):
@@ -488,6 +495,21 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
                 q_q[i].append(q_psi(max(q_data['Psi'])))
             else:
                 q_q[i].append(0)
+
+    '''profiles'''
+    if share:
+        path_res = 'eq_results/%s/' % Shotn
+        try:
+            with open(path_res + str(Shotn) + '_prof_by_psi.json', 'r') as prof_file:
+                ex_prof = json.load(prof_file)
+            if time*1000 not in ex_prof:
+                ex_prof[(time*1000)] = {}
+        except FileNotFoundError:
+            ex_prof = {(time*1000): {}}
+        ex_prof[(time*1000)]['psi_b'] = float(up* 8 * pi * pi / 10)
+
+        with open(path_res + str(Shotn) + '_prof_by_psi.json', 'w') as prof_file:
+            json.dump(ex_prof, prof_file)
 
     if share:
         with open(PATH_res + str(Shotn) + '_' + str(round(time, 3)) + '_q_res.txt', 'w') as qresfile:
@@ -519,9 +541,9 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
             [[i / 100 for i in mcc_bound['z']][j] * diff_r[j] - [i / 100 for i in mcc_bound['r']][j] * diff_z[j] for j in
             range(len(mcc_bound['r']) - 1)]))
 
-        print('-------------------')
+        '''print('-------------------')
         print(area, area2)
-        print('-------------------')
+        print('-------------------')'''
         dif_y1 = abs(max(y)) - abs(max([i / 100 for i in mcc_bound['z']]))
         dif_y2 = abs(min(y)) - abs(min([i / 100 for i in mcc_bound['z']]))
         '''if show == True:
@@ -531,12 +553,15 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
         dif_x1 = abs(max(x)) - abs(max([i / 100 for i in mcc_bound['r']]))
         dif_x2 = abs(min(x)) - abs(min([i / 100 for i in mcc_bound['r']]))
         dif_y1 = abs(max(y)) - abs(max([i / 100 for i in mcc_bound['z']]))
-        dif_y2 = abs(min(y)) - abs(min([i / 100 for i in mcc_bound['z']]))
+        if min(y) <= zx0:
+            dif_y2 = abs(min(y)) - abs(min([i / 100 for i in mcc_bound['z']]))
+        else:
+            dif_y2 = abs(zx0) - abs(min([i / 100 for i in mcc_bound['z']]))
         '''print('-------------------')
         print((abs(dif_y1) + abs(dif_y2)) / 2)
         print(dif_x1, dif_x2)
         print('-------------------')'''
-        return (abs(dif_x1) + abs(dif_x2)) / 2, (abs(dif_y1)) / 2, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm, strike_point, q_95
+        return (abs(dif_x1) + abs(dif_x2)) / 2, (abs(dif_y1)) / 10, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm, strike_point, q_95
     else:
         print('ERROR')
         return 0, 0, [], [], [], 0, 0, 0, 0, 0, {}, 0
@@ -552,10 +577,10 @@ def find_li(li):
     else:
         ind = np.where((ind_find[0] > 30) & (ind_find[0] < 50))
         ind_0 = ind[0][int(len(ind[0]) / 2)]
-        print(ind[0][int(len(ind[0]) / 2)])
+        #print(ind[0][int(len(ind[0]) / 2)])
     ind1 = ind_find[0][ind_0]
     ind2 = ind_find[1][ind_0]
-    print('li: ', float(li_arr[ind1, ind2]))
+    #print('li: ', float(li_arr[ind1, ind2]))
     return al11_arr[int(ind1)], al22_arr[int(ind2)]
 
 def find_li2(li, alf1=0):
@@ -582,11 +607,11 @@ def find_par(par, Shotn, time, I_coil, betta_po, li, bounds, show2=False, share=
     for change in range(bounds[0], bounds[1], bounds[2]):
         if par == 'betta_po':
             betta_po = change / 100
-            print(betta_po)
+            #print(betta_po)
         elif par == 'li':
             alf11, alf22 = find_li(change / 100)
-            print('li_want ', change / 100)
-            print(alf11, alf22)
+            #print('li_want ', change / 100)
+            #print(alf11, alf22)
         else:
             print('error!', par)
             break
@@ -744,7 +769,7 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
             ground_psi = 0.05
         while delta_psi > ground_psi:
             par_test = round((bnd_e + bnd_s) / 2, 2)
-            print(par_test)
+            #print(par_test)
             if par == 'betta_po':
                 betta_po = par_test / 100
                 #print(betta_po)
@@ -759,7 +784,7 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
 
             try:
                 pic += 1
-                print('.................................', betta_po, pic, '.................................')
+                #print('.................................', betta_po, pic, '.................................')
                 if pic < 11:
                     if show2:
                         ax = fig.add_subplot(3, 7, pic)
@@ -877,6 +902,7 @@ def find_par2(par, mode, Shotn, time, I_coil, betta_po, li, bounds, pdf, show2=F
 
 
 def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
+    path_res = 'eq_results/%s/' % Shotn
     q = 1.602176634e-19
     time = time * 1e3
     try:
@@ -948,6 +974,23 @@ def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
     plt.plot(rgr, TS_press[js0], label='electron')
     plt.scatter(R_TS_raw, P_TS_raw, label='TS')
     plt.vlines(r_axis, min(P_TS_raw), max(P_TS_raw)*1.2, color='black')
+
+    try:
+        with open(path_res + str(Shotn) + '_prof_by_psi.json', 'r') as prof_file:
+            ex_prof = json.load(prof_file)
+    except FileNotFoundError:
+        ex_prof = {time: {'psi': [], 'Pe': [], 'Te': [], 'Te_err': [], 'ne': [], 'ne_err': []}}
+
+    ex_prof[str(time)]['psi'] = list(Psi_R_for_TS(R_TS_raw))
+    ex_prof[str(time)]['Pe'] = list(P_TS_raw)
+    ex_prof[str(time)]['ne'] = list(ne_raw['ne'])
+    ex_prof[str(time)]['ne_err'] = list(ne_raw['err'])
+    ex_prof[str(time)]['Te'] = list(Te['Te'])
+    ex_prof[str(time)]['Te_err'] = list(Te['err'])
+    ex_prof[str(time)]['psi_axis'] = float(Psi_R_for_TS(r_axis))
+    with open(path_res + str(Shotn) + '_prof_by_psi.json', 'w') as prof_file:
+        json.dump(ex_prof, prof_file)
+
 
     '''with open(str(Shotn) + '_' + str(time) + '_TS_press.json', 'w') as ts_file:
         for_wr = {'Pressure': [float(i) for i in TS_press[js0]], 'R': rgr, 'TS_data':
@@ -1075,7 +1118,8 @@ def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
                 plt.ylim(0, max(P_TS_raw) * 1.2)
                 plt.savefig('el_ion_prof/' + str(Shotn) + '_' + str(time) + '.png')
                 W_ion = 0
-                print('Ti file not found')
+                #print('Ti file not found')
+                print('time ', round(time, 1), ' not found in ', time_li)
                 W_ion = 0
         except FileNotFoundError:
             plt.legend()
@@ -1083,7 +1127,7 @@ def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
             plt.ylim(0, max(P_TS_raw) * 1.2)
             plt.savefig('el_ion_prof/' + str(Shotn) + '_' + str(time) + '.png')
             W_ion = 0
-            print('Ti file not found')
+            print('Ti file or Zeff file not found not found')
 
     else:
         plt.legend()

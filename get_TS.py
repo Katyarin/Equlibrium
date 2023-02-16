@@ -3,8 +3,7 @@ import json
 import matplotlib.pyplot as plt
 URL = 'https://172.16.12.130:443/api'
 q = 1.602176634e-19
-PATH = {22: '//172.16.12.127/Pub/!!!TS_RESULTS/2022/', 21:  '//172.16.12.127/Pub/!!!TS_RESULTS/2021/',
-        20: '//172.16.12.127/Pub/!!!TS_RESULTS/2020/'}
+PATH = {22: '//172.16.12.127/Pub/!!!TS_RESULTS/shots/'}
 
 '''shotn = 41615
 time = 180'''

@@ -5,23 +5,42 @@ import subprocess
 import matplotlib.pyplot as plt
 import time as t
 from matplotlib.backends.backend_pdf import PdfPages
+import json
 
-tomorow = '221202'
-date_of_culc = '221202_2'
+tomorow = '230207'
+date_of_culc = '221201'
 Path_res = 'results/'
 
-Shotn = 42567
+
+Shotn = 42529
+shot_without_plasma = 42531
 mode = 'psi' #'sep' or 'psi'
+my = False
+coincidence = False
 
 pi = 3.14159265359
 mu0 = 4*pi*1e-7
 PATH = 'c:/work/equilibrium/Globus_PET/'
 path_res = 'eq_results/%s/' %Shotn
 
+with open('eq_results/statistic.json', 'r') as statFile:
+    statistic = json.load(statFile)
+statistic['data_of_culc'][Shotn] = date_of_culc
+statistic['shot_without_plasma'][Shotn] = shot_without_plasma
+
+stat_list ={}
+for key in statistic:
+    if key != 'data_of_culc' and key != 'shot_without_plasma':
+        statistic[key][Shotn] = {'av': 0, 'range': 0}
+        stat_list[key] = []
+
 dia_data = {}
 try:
     p = 0
-    with open('c:/work/equilibrium/dia_data/%d.txt' %Shotn, 'r') as file:
+    dia_file = 'c:/work/equilibrium/dia_data/%d.txt' % Shotn
+    if my:
+        dia_file = 'c:/work/equilibrium/dia_data/my/%d.txt' % Shotn
+    with open(dia_file, 'r') as file:
         for line in file:
             data = line.split(',')
             if p == 0:
@@ -73,6 +92,7 @@ except FileNotFoundError:
 
 print(dia_data)
 I_coil_new = dia_data['Ip']
+print(len(I_coil_new))
 time_list = [i / 1000 for i in dia_data['time']]
 betta_I_sakharov = [round(i, 2) for i in dia_data['betadia\n']]
 betta_I_list = []
@@ -97,7 +117,8 @@ betta_I_list = culc_data['beta_I']
 li_list = culc_data['li_code']
 pdf_file = PdfPages(path_res + tomorow + '_' + str(Shotn) + '_second_plots.pdf')
 
-with open(path_res + 'test_' + tomorow + 'res_2_' + str(Shotn) + '.txt', 'a') as res_file:
+
+with open(path_res + tomorow + '_res_' + str(Shotn) + '.txt', 'w') as res_file:
     res_file.write('%8s' % 'time')
     res_file.write('%8s' % 'beta_I')
     res_file.write('%8s' % 'beta_p')
@@ -128,13 +149,15 @@ with open(path_res + 'test_' + tomorow + 'res_2_' + str(Shotn) + '.txt', 'a') as
     res_file.write('%14s' % 'q95')
     res_file.write('\n')
 
+print(len(time_list))
+
 for ind, time in enumerate(time_list):
     try:
         f = '//172.16.12.127/Pub/!!!CURRENT_COIL_METHOD/V3_zad7_mcc/mcc_%d.json' % Shotn
     except FileNotFoundError:
         print('not found in new version')
     # f = '//172.16.12.127/Pub/!!!CURRENT_COIL_METHOD/old_mcc/mcc_%d.json' % Shotn
-    time, Rc, Rcm = Find_boundary.bound(f, time)
+    time, Rc, Rcm, Rav, k = Find_boundary.bound(f, time)
     print('new time: ', time)
 
     I_coil = Globus_PET.get_coils(Shotn, time)
@@ -147,7 +170,11 @@ for ind, time in enumerate(time_list):
     li_acc2 = li_list[ind]
 
     Globus_PET.COIL_upd(Shotn, time, I_coil, Bt[ind])
-    b_I, li_3, bp, W_all, We, V, S, P_axis, li_code, Ftor_pl, Wi, bounds_delta_res, ne_av, strike_point, q95 = Globus_PET.find_bound(Shotn,
+    bounds_delta_res = 1000
+    trying = 0
+    coid = True
+    while abs(float(bounds_delta_res) - float(culc_data['boundDr'][ind])) > 0.00005 and coid:
+        b_I, li_3, bp, W_all, We, V, S, P_axis, li_code, Ftor_pl, Wi, bounds_delta_res, ne_av, strike_point, q95 = Globus_PET.find_bound(Shotn,
                                                                                                                   time,
                                                                                                                   I_coil,
                                                                                                                   betta_I,
@@ -157,6 +184,17 @@ for ind, time in enumerate(time_list):
                                                                                                                   inside=True,
                                                                                                                   Wi=True,
                                                                                                                   share=True)
+        coid = coincidence
+        trying +=1
+        print(li_acc2)
+        if trying < 6:
+            li_acc2 += 0.00001
+        elif trying == 6:
+            li_acc2 = li_acc2 - 0.00006
+        else:
+            li_acc2 = li_acc2 - 0.00001
+        print(li_acc2)
+        print('time: ', time, ', trying no ', trying, ' ', abs(float(bounds_delta_res) - float(culc_data['boundDr'][ind])))
     rb = []
     zb = []
     with open(Path_res + str(Shotn) + '_' + str(round(time, 3)) + '_bound.txt', 'r') as file2:
@@ -189,13 +227,24 @@ for ind, time in enumerate(time_list):
     k = b/a
     tr_up = (R-r_low) /a
     tr_down = (R-r_up) /a
-    with open(path_res + 'test_' + tomorow + 'res_2_' + str(Shotn) + '.txt', 'a') as res_file:
+    stat_list['beta_I'].append(float(betta_I))
+    stat_list['li'].append(float(li_3))
+    stat_list['Bt'].append(Bt[ind])
+    stat_list['Ip'].append(I_coil['Ipl'])
+    stat_list['W'].append(W_all)
+    stat_list['We'].append(We)
+    if Wi != 0:
+        stat_list['Wi'].append(Wi)
+    stat_list['<ne>'].append(ne_av)
+    stat_list['k'].append(k)
+    stat_list['A'].append(R/a)
+    with open(path_res + tomorow + '_res_' + str(Shotn) + '.txt', 'a') as res_file:
         res_file.write('%8.4f' % time)
         res_file.write('%8.4f' % float(betta_I))
         res_file.write('%8.4f' % float(bp))
         res_file.write('%8.4f' % float(li_3))
         res_file.write('%14.4f' % W_all)
-        res_file.write('%14.4f' % (3/2 *betta_I * (mu0*I_coil['Ipl']*1000*I_coil['Ipl']*1000*r_ax) / 4))
+        res_file.write('%14.4f' % (3/2 *betta_I * (mu0*I_coil['Ipl']*1000*I_coil['Ipl']*1000*R) / 4))
         res_file.write('%14.4f' % We)
         res_file.write('%8.4f' % V)
         res_file.write('%8.4f' % S)
@@ -221,3 +270,13 @@ for ind, time in enumerate(time_list):
         res_file.write('\n')
 
 pdf_file.close()
+for key in stat_list.keys():
+    print(key)
+    if stat_list[key]:
+        statistic[key][Shotn]['av'] = sum(stat_list[key])/len(stat_list[key])
+        statistic[key][Shotn]['range'] = (max(stat_list[key]) - min(stat_list[key]))/2
+    else:
+        print('no data')
+
+with open('eq_results/statistic.json', 'w') as statFileres:
+    json.dump(statistic, statFileres)
