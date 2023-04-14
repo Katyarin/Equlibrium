@@ -7,8 +7,8 @@ zb = []
 Path_res = 'results/'
 PATH = 'c:/work/equilibrium/Globus_PET/'
 
-Shotn = 41644
-time = 180 #ms
+Shotn = 42368
+time = 200 #ms
 
 with open(PATH + 'BLANFW.DAT', 'r') as file3:
     blanfw = []
@@ -71,7 +71,7 @@ for i in range(len(result)):
         ugr.append(result[i][1:])
 
 fig = plt.figure(figsize=(5, 8))
-fig.patch.set_facecolor('#DDE9EC')
+#fig.patch.set_facecolor('#DDE9EC')
 ax = fig.add_subplot(111)
 ax.set_xlim(0, 1)
 ax.set_ylim(-0.8, 0.8)
@@ -79,6 +79,7 @@ ax.contour(rgr, zgr, ugr, levels=50, alpha=0.5)
 ax.plot(rb, zb, 'r', label='LCMS')
 for dot in dots.keys():
     ax.scatter(dots[dot][0], dots[dot][1], marker='x',  zorder=2)
+    print(dots[dot][0], dots[dot][1])
 
 ax.plot([float(blanfw[i + 2][1]) for i in range(nvv)], [float(blanfw[i + 2][2]) for i in range(nvv)], 'black')
 ax.plot([float(blanfw[i + 2][3]) for i in range(nvv)], [float(blanfw[i + 2][4]) for i in range(nvv)], 'black')
@@ -92,11 +93,11 @@ ax.set_ylabel('z, m')
 ax.set_xlabel('r, m')
 ax.legend()
 ax.set_title('shot #%i, time = %i ms' %(Shotn, time) )
-ax.set_facecolor('#DDE9EC')
+#ax.set_facecolor('#DDE9EC')
 
 print(len(r_coil))
 for i in range(len(r_coil)):
     ax.add_patch(Rectangle((r_coil[i] - dr_coil[i]/2, z_coil[i]- dz_coil[i]/2), dr_coil[i], dz_coil[i], ec='blue'))
 #ax.scatter(r_coil, z_coil, zorder=2)
-plt.savefig('plots/%i_%.2f.png' %(Shotn, time), dpi=600)
+plt.savefig('plots/%i_%.2f.png' %(Shotn, time), dpi=600, transparent=True)
 plt.show()

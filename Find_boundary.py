@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 f = 'mcc_37893.json'
 
 def bound(file_name, t, plotting=False, ax=0):
+    lim_min = 0.125
+    lim_max = 0.61
     with open(file_name, 'r') as file:
         data_mcc = json.load(file)
         time = data_mcc['time']['variable']
@@ -28,12 +30,20 @@ def bound(file_name, t, plotting=False, ax=0):
     k = (max(boundary['z']) - min(boundary['z'])) / (max(boundary['r']) - min(boundary['r']))
     Rc = (max(rb[index_time][1:]) + min(rb[index_time][1:])) / 200
     Rcm = sum(rb[index_time][1:]) / len(rb[index_time][1:]) / 100
+    if abs(max(boundary['r']) / 100 - lim_max) < 0.001 or abs(min(boundary['r']) / 100 - lim_min) < 0.001:
+        print('low field side', max(boundary['r']) / 100 - lim_max)
+        print('high field side', min(boundary['r']) / 100 - lim_min)
+        configure = 'lim'
+    else:
+        print('low field side', max(boundary['r']) / 100 - lim_max)
+        print('high field side', min(boundary['r']) / 100 - lim_min)
+        configure = 'div'
     #print(max(rb[index_time][1:]), min(rb[index_time][1:]))
     with open('c:/work/equilibrium/Globus_PET/MCC.json', 'w') as file2:
         json.dump(boundary, file2)
     if plotting == True:
         print('we_here')
         ax.plot(boundary['r'], boundary['z'])
-    return time[index_time], Rc, Rcm, Rav, k
+    return time[index_time], Rc, Rcm, Rav, k, configure
 
 

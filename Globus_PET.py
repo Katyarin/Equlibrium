@@ -10,6 +10,9 @@ import subprocess
 from scipy import interpolate as inter
 import get_TS
 from pathlib import Path
+import asyncio
+
+done_process = []
 pi = 3.14159265359
 
 PATH = 'c:/work/equilibrium/Globus_PET/'
@@ -65,9 +68,13 @@ def get_coils(Shotn, time, shotn_sub: int=0, path: str='/'):
     return I_coil
 
 
-def DURS_upd(Shotn, time, Ip, betta_po, alf11, alf22):
+def DURS_upd(Shotn, time, Ip, betta_po, alf11, alf22, N=0):
     DURS = []
-    with open(PATH + 'DURS.DAT', 'r') as file1:
+    if N:
+        PATH_loc = PATH + 'PET' + str(N) + '/'
+    else:
+        PATH_loc = PATH
+    with open(PATH_loc + 'DURS.DAT', 'r') as file1:
         for line in file1:
             DURS.append(line.split())
 
@@ -82,7 +89,7 @@ def DURS_upd(Shotn, time, Ip, betta_po, alf11, alf22):
     DURS_new[10][0] = str(alf11)
     DURS_new[11][0] = str(alf22)
 
-    with open(PATH + 'DURS.DAT', 'w') as file2:
+    with open(PATH_loc + 'DURS.DAT', 'w') as file2:
         for line in DURS_new:
             for element in range(len(line)):
                 if element == 0:
@@ -94,9 +101,13 @@ def DURS_upd(Shotn, time, Ip, betta_po, alf11, alf22):
     #print('DURS.DAT updated')
 
 
-def COIL_upd(Shotn, time, I_coil, Bt):
+def COIL_upd(Shotn, time, I_coil, Bt, N=0):
     COIL = []
-    with open(PATH + 'COIL.DAT', 'r') as file3:
+    if N:
+        PATH_loc = PATH + 'PET' + str(N) + '/'
+    else:
+        PATH_loc = PATH
+    with open(PATH_loc + 'COIL.DAT', 'r') as file3:
         for line in file3:
             COIL.append(line.split())
 
@@ -143,7 +154,7 @@ def COIL_upd(Shotn, time, I_coil, Bt):
     for i in range(45,56,2):
         COIL_new[i][6] = I_coil['Ics'] * 1e-3
 
-    with open(PATH + 'COIL.DAT', 'w') as file4:
+    with open(PATH_loc + 'COIL.DAT', 'w') as file4:
         for line in range(len(COIL_new)):
             for element in range(len(COIL_new[line])):
                 #print(el)
@@ -160,42 +171,104 @@ def COIL_upd(Shotn, time, I_coil, Bt):
                 #print(el2)
                 file4.write(' %s' % el2)
             file4.write('\n')
-        print('COIL.DAT updated')
+        #print('COIL.DAT updated')
 
-    with open(PATH + 'DINA_ADD.DAT', 'w') as file5:
+    with open(PATH_loc + 'DINA_ADD.DAT', 'w') as file5:
         file5.write(' RSO  ( cm)   BT0 (kGauss) ')
         file5.write('\n')
         file5.write(str(' 36.          ' + str(int(Bt*10)) + '.'))
         file5.write('\n')
         file5.write('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-        print('DINA_ADD.DAT updated')
+        #print('DINA_ADD.DAT updated')
+
+def DATA_upd(conf, N=0):
+    DATA = []
+    if N:
+        PATH_loc = PATH + 'PET' + str(N) + '/'
+    else:
+        PATH_loc = PATH
+    with open(PATH_loc + 'DATA.DAT', 'r') as file1:
+        for line in file1:
+            DATA.append(line.split())
+
+    DATA_new = DATA
+    if conf == 'lim':
+        DATA_new[8][0] = '1'
+    if conf == 'div':
+        DATA_new[8][0] = '0'
+
+    with open(PATH_loc + 'DATA.DAT', 'w') as file2:
+        for line in DATA_new:
+            for element in range(len(line)):
+                if element == 0:
+                    file2.write(' %-12s' % line[element])
+                else:
+                    file2.write(' %s' % line[element])
+            file2.write('\n')
+
+async def run():
+    global done_process
+    pid_list = []
+    for i in range(1,9):
+        cmd = 'cd c:/work/equilibrium/Globus_PET/PET%i && helisvf.exe' %i
+        proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE)
+        pid_list.append(proc.pid)
+    timer.sleep(5)
+    for i, pid in enumerate(pid_list):
+        proc_kill = await asyncio.create_subprocess_shell('taskkill /PID %s /F /T' %str(pid), stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE)
+        stdout, stderr = await proc_kill.communicate()
+        if stderr.decode("cp866"):
+            done_process.append(i+1)
 
 
-def EVOL_res():
+async def wait_func():
+    await asyncio.wait_for(run(), timeout=10)
+
+
+def EVOL_res(N=0):
     EVOL0 = []
-    with open(PATH + 'EVOL0.PRT', 'r') as file2:
+    if N:
+        PATH_loc = PATH + 'PET' + str(N) + '/'
+    else:
+        PATH_loc = PATH
+    with open(PATH_loc + 'EVOL0.PRT', 'r') as file2:
         for line in file2:
             EVOL0.append(line.split())
     if len(EVOL0) < 376:
         return -1
     else:
-        Rc = (float(EVOL0[388][EVOL0[388].index('Rmax') + 2]) + float(EVOL0[389][EVOL0[389].index('Rmin') + 2])) / 2
-        Result = {'li': float(EVOL0[377][EVOL0[377].index('LI3') + 2]), 'betpol': float(EVOL0[376][EVOL0[376].index('BETpol') + 2]),
-                  'Rc': Rc}
+        if EVOL0[365][0] == 'PRINT':
+            Rc = (float(EVOL0[388][EVOL0[388].index('Rmax') + 2]) + float(EVOL0[389][EVOL0[389].index('Rmin') + 2])) / 2
+            Result = {'li': float(EVOL0[377][EVOL0[377].index('LI3') + 2]), 'betpol': float(EVOL0[376][EVOL0[376].index('BETpol') + 2]),
+                      'Rc': Rc}
+        else:
+            #print('div configure?')
+            Rc = (float(EVOL0[390][EVOL0[390].index('Rmax') + 2]) + float(EVOL0[391][EVOL0[391].index('Rmin') + 2])) / 2
+            Result = {'li': float(EVOL0[379][EVOL0[379].index('LI3') + 2]),
+                      'betpol': float(EVOL0[378][EVOL0[378].index('BETpol') + 2]),
+                      'Rc': Rc}
         return Result
 
-def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', inside=False, share=False):
+def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', inside=False, share=False, N=0):
 
     out_data_raw = []
+    if N:
+        PATH_loc = PATH + 'PET' + str(N) + '/'
+    else:
+        PATH_loc = PATH
 
-    with open(PATH + 'out.wr', 'r') as file:
+    with open(PATH_loc + 'out.wr', 'r') as file:
         for line in file:
             out_data_raw.extend(line.split())
 
 
     q_data = {}
     line_count = 0
-    with open(PATH + 'q.pr', 'r') as q_file:
+    with open(PATH_loc + 'q.pr', 'r') as q_file:
         for line in q_file:
             data = line.split()
             if line_count < 1:
@@ -339,7 +412,7 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
     if show == True:
         ax.plot([i / 100 for i in mcc_bound['r']], [i / 100 for i in mcc_bound['z']], 'r', label='MCC')
         ax.legend()
-    with open(PATH + 'BLANFW.DAT', 'r') as file3:
+    with open(PATH_loc + 'BLANFW.DAT', 'r') as file3:
         blanfw = []
         for line in file3:
             blanfw.append(line.split())
@@ -352,7 +425,7 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
         ax.plot([float(blanfw[i + 2][1]) for i in range(nvv)], [float(blanfw[i + 2][2]) for i in range(nvv)], 'black')
         ax.plot([float(blanfw[i + 2][3]) for i in range(nvv)], [float(blanfw[i + 2][4]) for i in range(nvv)], 'black')
 
-    with open(PATH + 'LIMPNT.dat', 'r') as file4:
+    with open(PATH_loc + 'LIMPNT.dat', 'r') as file4:
         limpnt = []
         for line in file4:
             limpnt.append(line.split())
@@ -375,9 +448,13 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
             else:
                 ind_first = ind - 5
                 ind_last = ind + 1
+
             k1, b1 = np.polyfit(x[ind_first:ind_last], y[ind_first:ind_last], 1)
 
-            strike_point[list(strike_point.keys())[j]].extend([(b1 - b2) / (k2 - k1), (k2 * b1 - k1 * b2) / (k2 - k1)])
+            try:
+                strike_point[list(strike_point.keys())[j]].extend([(b1 - b2) / (k2 - k1), (k2 * b1 - k1 * b2) / (k2 - k1)])
+            except UnboundLocalError:
+                strike_point[list(strike_point.keys())[j]].extend([-1000, -1000])
     else:
         for j in range(2):
             strike_point[list(strike_point.keys())[j]].extend([-1000,-1000])
@@ -507,6 +584,8 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
         except FileNotFoundError:
             ex_prof = {(time*1000): {}}
         ex_prof[(time*1000)]['psi_b'] = float(up* 8 * pi * pi / 10)
+        ex_prof[(time*1000)]['psi_P'] = list(norm_ugr[js0])
+        ex_prof[(time*1000)]['P'] = list([float(i) for i in press[js0]])
 
         with open(path_res + str(Shotn) + '_prof_by_psi.json', 'w') as prof_file:
             json.dump(ex_prof, prof_file)
@@ -552,16 +631,28 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
     elif compare == 'dot':
         dif_x1 = abs(max(x)) - abs(max([i / 100 for i in mcc_bound['r']]))
         dif_x2 = abs(min(x)) - abs(min([i / 100 for i in mcc_bound['r']]))
-        dif_y1 = abs(max(y)) - abs(max([i / 100 for i in mcc_bound['z']]))
-        if min(y) <= zx0:
+        lim_min = 0.125
+        lim_max = 0.61
+        if abs(max(mcc_bound['r']) / 100 - lim_max) > 0.005 or abs(min(mcc_bound['r']) / 100 - lim_min) > 0.005:
+            if min(x) < lim_min or max(x)>lim_max:
+                dif_x1, dif_x2 = 0.1, 0.1
+        if zx0 > 0:
             dif_y2 = abs(min(y)) - abs(min([i / 100 for i in mcc_bound['z']]))
+            if abs(max(y)) > zx0:
+                dif_y1 = abs(zx0) - abs(max([i / 100 for i in mcc_bound['z']]))
+            else:
+                dif_y1 = abs(max(y)) - abs(max([i / 100 for i in mcc_bound['z']]))
         else:
-            dif_y2 = abs(zx0) - abs(min([i / 100 for i in mcc_bound['z']]))
+            dif_y1 = abs(max(y)) - abs(max([i / 100 for i in mcc_bound['z']]))
+            if min(y) <= zx0:
+                dif_y2 = abs(min(y)) - abs(min([i / 100 for i in mcc_bound['z']]))
+            else:
+                dif_y2 = abs(zx0) - abs(min([i / 100 for i in mcc_bound['z']]))
         '''print('-------------------')
         print((abs(dif_y1) + abs(dif_y2)) / 2)
         print(dif_x1, dif_x2)
         print('-------------------')'''
-        return (abs(dif_x1) + abs(dif_x2)) / 2, (abs(dif_y1)) / 10, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm, strike_point, q_95
+        return (abs(dif_x1) + abs(dif_x2)) / 2, (abs(dif_y1) + abs(dif_y2)) / 10, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm, strike_point, q_95
     else:
         print('ERROR')
         return 0, 0, [], [], [], 0, 0, 0, 0, 0, {}, 0
@@ -595,7 +686,7 @@ def find_li2(li, alf1=0):
     b21 = -0.1345
     b22 = 0.26
     alf2 = (li - a1 - b11 * alf1 - b21 * alf1 * alf1) / (a2 + b12 * alf1 + b22 * alf1 * alf1)
-    return alf1, alf2
+    return round(alf1,4), round(alf2, 4)
 
 def find_par(par, Shotn, time, I_coil, betta_po, li, bounds, show2=False, share=False):
     dif_list = []
@@ -988,6 +1079,8 @@ def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
     ex_prof[str(time)]['Te'] = list(Te['Te'])
     ex_prof[str(time)]['Te_err'] = list(Te['err'])
     ex_prof[str(time)]['psi_axis'] = float(Psi_R_for_TS(r_axis))
+    ex_prof[str(time)]['prof_e_psi'] = list(norm_ugr[js0])
+    ex_prof[str(time)]['prof_e_pe'] = list([float(i) for i in TS_press[js0]])
     with open(path_res + str(Shotn) + '_prof_by_psi.json', 'w') as prof_file:
         json.dump(ex_prof, prof_file)
 
@@ -1076,11 +1169,16 @@ def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
                 print('we are here')'''
                 ni = ne_r([elem / 1000 for elem in Ri])
                 ni_raw = ne_r([elem / 1000 for elem in Ri_raw])
+                Zeff = 0
+                count_Zeff = 0
                 for i, el in enumerate(Zeff_data['time']):
-                    if time - 2.5 < el < time + 2.5:
-                        '''print(el)
-                        print(Zeff_data['data'][i])'''
-                        Zeff = Zeff_data['data'][i]
+                    if time - 5 < el < time + 5:
+                        print(el)
+                        print(Zeff_data['data'][i])
+                        Zeff += Zeff_data['data'][i]
+                        count_Zeff +=1
+                Zeff = Zeff / count_Zeff
+                print(Zeff)
                 #print('Zeff:', Zeff)
                 ni_coeff = (Zeff - Z2) / (Z1 * Z1 - Z1 * Z2)
                 #print(ni_coeff)
@@ -1107,6 +1205,22 @@ def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
                 plt.grid()
                 plt.ylim(0, max(Pi_raw)*1.2)
                 plt.savefig('el_ion_prof/' + str(Shotn) + '_' + str(time) + '.png')
+
+                try:
+                    with open(path_res + str(Shotn) + '_prof_by_psi.json', 'r') as prof_file:
+                        ex_prof = json.load(prof_file)
+                except FileNotFoundError:
+                    ex_prof = {time: {'psi': [], 'Pe': [], 'Te': [], 'Te_err': [], 'ne': [], 'ne_err': []}}
+
+                ex_prof[str(time)]['psi_i'] = list([float(i) for i in Psi_R_for_TS([elem / 1000 for elem in Ri_raw])])
+                ex_prof[str(time)]['Pi'] = list(Pi_raw)
+                #ex_prof[str(time)]['ni'] = list(ne_raw['ne'])
+                #ex_prof[str(time)]['Ti'] = list(Te['Te'])
+                #ex_prof[str(time)]['prof_i'] = {'psi': norm_ugr[js0], 'Pi': ion_press[js0]}
+                ex_prof[str(time)]['prof_i_psi'] = list(norm_ugr[js0])
+                ex_prof[str(time)]['prof_i_p'] = list([float(i) for i in ion_press[js0]])
+                with open(path_res + str(Shotn) + '_prof_by_psi.json', 'w') as prof_file:
+                    json.dump(ex_prof, prof_file)
 
                 W_prob_i = []
                 for z in range(len(ion_press[0])):
@@ -1139,16 +1253,23 @@ def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
     return W_electron, error, W_ion, ne_av
 
 def find_bound(Shotn, time, I_coil, betta_I, li, alf1=0, k=0, pdf=None, show2=True, inside=False, Wi=False, share=False):
-    alf11, alf22 = find_li2(li, alf1=alf1)
+    try:
+        alf11, alf22 = li[0], li[1]
+    except TypeError:
+        alf11, alf22 = find_li2(li, alf1=alf1)
     print("'''''''''alpha''''''''''''''")
     print(alf11, alf22)
     #print(Shotn, time, I_coil, betta_I, alf11, alf22)
     DURS_upd(Shotn, time, I_coil['Ipl'], betta_I, alf11, alf22)
     try:
         process = subprocess.Popen(["run.bat"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
         stdout, stderr = process.communicate(timeout=5)
+        #print(stdout)
+        #print(stderr)
+        #test = input('?')
         result = EVOL_res()
-        print(result)
+        #print(result)
         if result == -1:
             print('NOT COUNT')
         else:
@@ -1166,5 +1287,147 @@ def find_bound(Shotn, time, I_coil, betta_I, li, alf1=0, k=0, pdf=None, show2=Tr
         subprocess.check_call("TASKKILL /F /PID {pid} /T".format(pid=process.pid))
 
 
+def find_par_fast(Shotn, time, I_coil, betta_po, pdf, psi_dia_sakh, show2=False):
+    global done_process
+    dif_list = []
+    dif_list2 = []
+    dif_list3 = []
+    min_par = 0
+    min_par_want = 0
+    minimum = 1000
+
+    res = {'li': [], 'bp': []}
+    pic = 0
+    if show2:
+        fig = plt.figure()
+        fig.suptitle('t = ' + str(time) + ' bI = ' + str(betta_po))
+        fig.set_figheight(10)
+        fig.set_figwidth(20)
+
+    minimum_delta = 1
+    bounds = [0, 0, 0]
+    bounds[0] = 0.8
+    bounds[1] = 1.2
+    #bounds[2] = 0.01
+
+    li_list = [bounds[0] + (bounds[1]-bounds[0])/8 * i for i in range(8)]
+    for ind0, el in enumerate(li_list):
+        ind = ind0 + 1
+        alf11, alf22 = find_li2(el)
+        DURS_upd(Shotn, time, I_coil['Ipl'], betta_po, alf11, alf22, N=ind)
+
+    done_process = []
+    asyncio.run(wait_func())
+    #print(done_process)
+
+    for ind0, el in enumerate([li_list[i-1] for i in done_process]):
+        ind = ind0+1
+        result = EVOL_res(ind)
+
+        if show2:
+            pic += 1
+            ax = fig.add_subplot(2, 8, pic)
+        else:
+            ax = 0
+
+        if result == -1:
+            print(ind)
+            print('NOT COUNT')
+            continue
+
+        name = 'li = ' + str(round(result['li'], 2)) + ', bp = ' + str(round(result['betpol'], 2))
+        dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm, strike_point, q95 = compare_bound(
+            Shotn, time, name, ax, show=show2, N=ind)
+
+        dif = (abs(dif_x) + abs(dif_y)) / 2
+        dif_list.append(abs(dif_x))
+        dif_list2.append((dif_y))
+        dif_list3.append(dif)
+        res['li'].append(result['li'])
+        res['bp'].append(result['betpol'])
+        psi_pet = Ftor_pl * 1000
+        delta_psi = (psi_dia_sakh - psi_pet)/psi_dia_sakh
+        if minimum > abs(dif):
+            minimum = abs(dif)
+            minimum_delta = delta_psi
+            min_par = result['li']
+            min_par_want = el
+
+    alpha = {}
+    li_list = [min_par_want - 0.4 + 0.1 * i for i in range(8)]
+    for ind0, el in enumerate(li_list):
+        ind = ind0 + 1
+        alf11, alf22 = find_li2(el)
+        alpha[ind] = [alf11, alf22]
+        DURS_upd(Shotn, time, I_coil['Ipl'], betta_po, alf11, alf22, N=ind)
+
+    done_process = []
+    #timer.sleep(5)
+    asyncio.run(wait_func())
+
+    #print(done_process)
+    ind_min = 1
+    minimum =1000
+
+    for ind0, el in enumerate([li_list[i - 1] for i in done_process]):
+        ind = ind0 + 1
+        result = EVOL_res(ind)
+
+        if show2:
+            pic += 1
+            ax = fig.add_subplot(2, 8, pic)
+        else:
+            ax = 0
+
+        if result == -1:
+            print(2, ind)
+            print('NOT COUNT')
+            continue
+
+        name = 'li = ' + str(round(result['li'], 2)) + ', bp = ' + str(round(result['betpol'], 2))
+        dif_x, dif_y, rgr, zgr, norm_ugr, W_all, V, S, P_axis, Ftor_pl, ipr, rm, strike_point, q95 = compare_bound(
+            Shotn, time, name, ax, show=show2, N=ind)
+
+        dif = (abs(dif_x) + abs(dif_y)) / 2
+        dif_list.append(abs(dif_x))
+        dif_list2.append((dif_y))
+        dif_list3.append(dif)
+        res['li'].append(result['li'])
+        res['bp'].append(result['betpol'])
+        psi_pet = Ftor_pl * 1000
+        #print(psi_dia_sakh, psi_pet)
+        delta_psi = (psi_dia_sakh - psi_pet)/psi_dia_sakh
+        #print(ind, dif)
+        if minimum > abs(dif):
+            minimum = abs(dif)
+            ind_min = ind
+            minimum_delta = delta_psi
+            min_par = result['li']
+            min_par_want = el
+
+    if show2:
+        pdf.savefig(fig)
+
+    if show2 == True:
+
+        x = res['li']
+
+        fig2, axes = plt.subplots(3, 1)
+        axes[0].set_title('x difference')
+        axes[0].plot(x, dif_list, 'o')
+        axes[0].grid()
+
+        axes[1].set_title('y difference')
+        axes[1].plot(x, dif_list2, 'o')
+        axes[1].grid()
+
+        axes[2].set_title('av difference')
+        axes[2].plot(x, dif_list3, 'o')
+        axes[2].grid()
+        axes[2].scatter(min_par,  minimum, color='r', marker='^', zorder=2.5)
+        pdf.savefig(fig2)
+
+    #print(min_par, min_par_want, minimum_delta, minimum)
+    return min_par, min_par_want, res, minimum_delta, minimum, alpha[ind_min]
 
 

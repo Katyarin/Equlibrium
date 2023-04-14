@@ -56,10 +56,6 @@ def dia_data(shot, recoupment, delta_time, start_time=0, end_time=0):
                     else:
                         t_end = round(t, 2)
                         break
-        if start_time:
-            t_start = start_time
-        if end_time:
-            t_end = end_time
         plt.figure()
         plt.plot(data['Программа тока Ip']['time'], data['Программа тока Ip']['data'])
         plt.axvline(t_start, color='r')
@@ -70,6 +66,10 @@ def dia_data(shot, recoupment, delta_time, start_time=0, end_time=0):
         plt.plot(data['Программа тока Ip']['time'][:-1], programm_Ip_diff, 'o-')
         plt.axvline(t_start, color='r')
         plt.axvline(t_end, color='r')
+    if start_time:
+        t_start = start_time
+    if end_time:
+        t_end = end_time
     print(t_start, t_end)
     time_need = [i/10 for i in range(int((t_start*10000)+ delta_time*10), int(t_end*10000), int(delta_time*10))]
     print(time_need)
@@ -87,7 +87,7 @@ def dia_data(shot, recoupment, delta_time, start_time=0, end_time=0):
     plt.plot(data['Ip внутр.(Пр2ВК) (инт.18)']['time'], data['Ip внутр.(Пр2ВК) (инт.18)']['data'])
     plt.axvline(t_start, color='r')
     plt.axvline(t_end, color='r')
-    plt.show()
+
 
 
     dia_sig1 = [data['Диамагнитный сигнал (новый инт.)']['data'][i] + data['Ics (4CS) (инт.22)']['data'][i] * 8e-6 for i in range(len(data['Ics (4CS) (инт.22)']['data']))]
@@ -95,7 +95,13 @@ def dia_data(shot, recoupment, delta_time, start_time=0, end_time=0):
 
     diamagnetic_sig = {'time': data['Диамагнитный сигнал (новый инт.)']['time'],
                        'data': [(dia_sig1[i] - dia_sig2[i]) * 2.915 for i in range(len(dia_sig1))]}
-
+    with open('test.txt', 'w') as file2:
+        for t_ind in range(len(diamagnetic_sig['time'])):
+            file2.write(str(diamagnetic_sig['time'][t_ind]))
+            file2.write('    ')
+            file2.write(str(diamagnetic_sig['data'][t_ind]))
+            file2.write('\n')
+    plt.show()
     '''plasma current'''
     Ip_all = [data['Ip внутр.(Пр2ВК) (инт.18)']['data'][i] - data['Up (внутреннее 175 петля)']['data'][i] * 370 - recoupment_data['Ip внутр.(Пр2ВК) (инт.18)']['data'][i] for i in range(len(data['Ip внутр.(Пр2ВК) (инт.18)']['data']))]
 
@@ -110,7 +116,7 @@ def dia_data(shot, recoupment, delta_time, start_time=0, end_time=0):
         except FileNotFoundError:
             print('not found in new version')
         # f = '//172.16.12.127/Pub/!!!CURRENT_COIL_METHOD/old_mcc/mcc_%d.json' % Shotn
-        time, Rc, Rcm, Rav, k = Find_boundary.bound(f, t/1000)
+        time, Rc, Rcm, Rav, k, conf = Find_boundary.bound(f, t/1000)
         Rc_list.append(Rc)
         Rcm_list.append(Rcm)
         Rav_list.append(Rav/100)
@@ -137,7 +143,6 @@ def dia_data(shot, recoupment, delta_time, start_time=0, end_time=0):
                     file.write('\n')
         print('dia_file saved')
 
-
-shotn = 42770
-rec = 42776
-dia_data(shotn, rec, 2, end_time=0)
+'''shotn = 42325
+rec = 42291
+dia_data(shotn, rec, 2.5, end_time=0)'''

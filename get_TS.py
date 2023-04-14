@@ -12,19 +12,15 @@ def get_data(shotn, time):
     ne_raw = []
     Te_raw = []
     for year in PATH.keys():
-        try:
-            print(PATH[year] + str(shotn) + '/' +str(shotn) + '_n(R).csv')
-            with open(PATH[year] + str(shotn) + '/' +str(shotn) + '_n(R).csv', 'r') as nfile:
-                for line in nfile:
-                    ne_raw.append(line.split(','))
-            with open(PATH[year] + str(shotn) + '/' + str(shotn) + '_T(R).csv', 'r') as nfile:
-                for line in nfile:
-                    Te_raw.append(line.split(', '))
-            error = None
-            break
-        except:
-            print('not find in ' + str(year))
-            continue
+        print(PATH[year] + str(shotn) + '/' +str(shotn) + '_n(R).csv')
+        with open(PATH[year] + str(shotn) + '/' +str(shotn) + '_n(R).csv', 'r') as nfile:
+            for line in nfile:
+                ne_raw.append(line.split(','))
+        with open(PATH[year] + str(shotn) + '/' + str(shotn) + '_T(R).csv', 'r') as nfile:
+            for line in nfile:
+                Te_raw.append(line.split(', '))
+        error = None
+        break
 
     if ne_raw:
         for i in range(1, len(ne_raw[0]), 2):
