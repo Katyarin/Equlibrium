@@ -26,7 +26,7 @@ data_name_need = ['Ip внутр.(Пр2ВК) (инт.18)', 'SXR 15 мкм', 'SXR
                   'nl 42 cm (1.5мм) 64pi', 'D-alfa  хорда R=42 cm',
                   'Emission electrode current', 'Ток пучка новый инжектор']
 
-shot = 41665
+shot = 43067
 data = get_sht_data(shot, data_name_need)
 with open('results/%i_sht_data.json' %shot, 'w') as res_file:
     json.dump(data, res_file)

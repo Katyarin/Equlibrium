@@ -11,16 +11,17 @@ import datetime
 b = str(datetime.date.today())
 tomorow = b[2:4] + b[5:7] + b[8:]
 #tomorow = '230329'
-date_of_culc = '230411'
+date_of_culc = '240604'
 Path_res = 'results/'
 
-shot_list = [42121]
+shot_list = [44330]
+pf2=1
 for Shotn in shot_list:
     print(Shotn)
     shot_without_plasma = 0
     mode = 'psi' #'sep' or 'psi'
     my = 1
-    coincidence = False
+    coincidence = True
 
     pi = 3.14159265359
     mu0 = 4*pi*1e-7
@@ -45,74 +46,7 @@ for Shotn in shot_list:
             statistic[key][Shotn] = {'av': 0, 'range': 0}
             stat_list[key] = []
 
-    dia_data = {}
-    try:
-        p = 0
-        dia_file = 'c:/work/equilibrium/dia_data/%d.txt' % Shotn
-        if my:
-            dia_file = 'c:/work/equilibrium/dia_data/my/%d.txt' % Shotn
-        with open(dia_file, 'r') as file:
-            for line in file:
-                data = line.split(',')
-                if p == 0:
-                    for i in data:
-                        dia_data[i] = []
-                    p+=1
-                else:
-                    for i, key in enumerate(list(dia_data.keys())):
-                        if data[i]:
-                            dia_data[key].append(float(data[i]))
-                        else:
-                            dia_data[key].append(0)
-    except:
-        print(dia_file)
-        print('file not found')
-        dia_file = 'c:/work/equilibrium/dia_data/%d.txt' % Shotn
-        with open(dia_file, 'r') as file:
-            for line in file:
-                data = line.split(',')
-                if p == 0:
-                    for i in data:
-                        dia_data[i] = []
-                    p+=1
-                else:
-                    for i, key in enumerate(list(dia_data.keys())):
-                        if data[i]:
-                            dia_data[key].append(float(data[i]))
-                        else:
-                            dia_data[key].append(0)
-    print(dia_data)
-
-    try:
-        l = 0
-        with open('c:/work/equilibrium/Ti_data/' + str(Shotn) + '.txt', 'r') as Ti_file:
-            for line in Ti_file:
-                data = line.split()
-                if l == 0:
-                    time_li = [float(data[i]) for i in range(1, len(data), 2)]
-                l+=1
-        print(time_li)
-        time_min = min(dia_data['time'])
-        time_max = max(dia_data['time'])
-        for t1 in time_li:
-            if time_min < t1 < time_max:
-                if t1 not in dia_data['time']:
-                    for i,t2 in enumerate(dia_data['time']):
-                        if t1 < t2:
-                            index = i
-                            break
-                    for key in dia_data.keys():
-                        if key=='time':
-                            dia_data[key].insert(index, t1)
-                        else:
-                            t2 = dia_data['time'][index+1]
-                            t0 = dia_data['time'][index-1]
-                            v2 = dia_data[key][index]
-                            v0 = dia_data[key][index-1]
-                            value = v0 + (v2-v0)*(t1-t0) / (t2 - t0)
-                            dia_data[key].insert(index, value)
-    except FileNotFoundError:
-        print("NO Ti data!")
+    dia_data = Globus_PET.openDiaFile(Shotn, my)
 
     print(dia_data)
     I_coil_new = dia_data['Ip']
@@ -177,7 +111,7 @@ for Shotn in shot_list:
         res_file.write('%14s' % 'r_sp_out')
         res_file.write('%14s' % 'z_sp_out')
         res_file.write('%14s' % 'q95')
-        res_file.write('%14s' % 'W_approxR')
+        res_file.write('%14s' % 'beta_t')
         res_file.write('\n')
 
     print(len(time_list))
@@ -189,13 +123,19 @@ for Shotn in shot_list:
             print('not found in new version')
         # f = '//172.16.12.127/Pub/!!!CURRENT_COIL_METHOD/old_mcc/mcc_%d.json' % Shotn
         time, Rc, Rcm, Rav, k, conf = Find_boundary.bound(f, time)
+        conf='lim'
         print('new time: ', time)
 
         I_coil = Globus_PET.get_coils(Shotn, time)
+
         print(I_coil)
         if I_coil_new:
             if I_coil_new[ind] != 0:
                 I_coil['Ipl'] = I_coil_new[ind] * 1e3
+
+        '''plasma shift!!!!!!!!!!!!!!!!!!!!!!
+        I_coil['Ipf2'] = 1000 *1e-3'''
+        print(I_coil)
 
         betta_I = betta_I_list[ind]
         li_acc2 = li_list[ind]
@@ -204,7 +144,65 @@ for Shotn in shot_list:
         else:
             alpha_loc = li_acc2
 
-        Globus_PET.COIL_upd(Shotn, time, I_coil, Bt[ind])
+        #Globus_PET.COIL_upd(Shotn, time, I_coil, Bt[ind], Rav, Ipf2oposite=True)
+        if pf2:
+            coil_data = {
+                'PF1_0': {'Icoil': I_coil['Ipf1'] * 1e-3},
+                'PF1_1': {'Icoil': I_coil['Ipf1'] * 1e-3},
+                'PF2_0': {'Icoil': dia_data['pf2Up'][ind] * 1e-3},
+                'PF2_1': {'Icoil': I_coil['Ipf2'] * 1e-3, 'link': 3},
+                'PF3_0': {'Icoil': I_coil['Ipf3'] * 1e-3},
+                'PF3_1': {'Icoil': I_coil['Ipf3'] * 1e-3},
+                'HFC1_0': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                'HFC1_1': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                'HFC2_0': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                'HFC2_1': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                'VFC_0': {'Icoil': I_coil['Ivfc'] * 1e-3},
+                'VFC_1': {'Icoil': I_coil['Ivfc'] * 1e-3},
+                'CC1_0': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 7},
+                'CC1_1': {'Icoil': I_coil['Icc'] * 1e-3},
+                'CC2_0': {'Icoil': I_coil['Icc'] * 1e-3},
+                'CC2_1': {'Icoil': I_coil['Icc'] * 1e-3},
+                'CC3_0': {'Icoil': I_coil['Icc'] * 1e-3},
+                'CC3_1': {'Icoil': I_coil['Icc'] * 1e-3},
+                'CS_0': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 8},
+                'CS_1': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 8},
+                'CS_2': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 8},
+                'CS_3': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 8},
+                'CS_4': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 8},
+                'CS_5': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 8}
+            }
+            # print(fast_ind)
+            Globus_PET.newCOIL_upd(Shotn, time, I_coil['Ipl'], Rav * 100, Bt[ind], coil_data)
+        else:
+            coil_data = {
+                'PF1_0': {'Icoil': I_coil['Ipf1'] * 1e-3},
+                'PF1_1': {'Icoil': I_coil['Ipf1'] * 1e-3},
+                'PF2_0': {'Icoil': I_coil['Ipf2'] * 1e-3},
+                'PF2_1': {'Icoil': I_coil['Ipf2'] * 1e-3, 'link': 2},
+                'PF3_0': {'Icoil': I_coil['Ipf3'] * 1e-3},
+                'PF3_1': {'Icoil': I_coil['Ipf3'] * 1e-3},
+                'HFC1_0': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                'HFC1_1': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                'HFC2_0': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                'HFC2_1': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                'VFC_0': {'Icoil': I_coil['Ivfc'] * 1e-3},
+                'VFC_1': {'Icoil': I_coil['Ivfc'] * 1e-3},
+                'CC1_0': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 6},
+                'CC1_1': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 6},
+                'CC2_0': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 6},
+                'CC2_1': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 6},
+                'CC3_0': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 6},
+                'CC3_1': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 6},
+                'CS_0': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 7},
+                'CS_1': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 7},
+                'CS_2': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 7},
+                'CS_3': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 7},
+                'CS_4': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 7},
+                'CS_5': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 7}
+            }
+            # print(fast_ind)
+            Globus_PET.newCOIL_upd(Shotn, time, I_coil['Ipl'], Rav * 100, Bt[ind], coil_data)
         Globus_PET.DATA_upd(conf)
         bounds_delta_res = 1000
         trying = 0
@@ -242,6 +240,7 @@ for Shotn in shot_list:
                 zb.append((float(data[1])))
         z_up = max(zb)
         z_low = min(zb)
+        print(z_low)
         r_out = max(rb)
         r_in = min(rb)
         r_up = rb[zb.index(z_up)]
@@ -255,15 +254,20 @@ for Shotn in shot_list:
                 else:
                     dots[data[0] + '_' + data[1]] = [float(data[2]), float(data[3])]
         r_ax = dots['magnetic_axis'][0]
+        print(dots['x-dot'][1])
         if z_low < dots['x-dot'][1]:
-            z_low = dots['x-dot'][1]
-            r_low = dots['x-dot'][0]
+            if z_low*dots['x-dot'][1]>0:
+                z_low = dots['x-dot'][1]
+                r_low = dots['x-dot'][0]
 
-        R = (r_out+ r_in)/2
-        Rav=Rav/100
-        a = (r_out- r_in)/2
+        R = (r_out + r_in)/2
+        Rav = Rav/100
+        a = (r_out - r_in)/2
         b = (z_up - z_low) /2
+        print(r_out, r_in, z_up, z_low)
+        print(a, b)
         k = b/a
+        print(k)
         tr_up = (R-r_low) /a
         tr_down = (R-r_up) /a
         stat_list['beta_I'].append(float(betta_I))
@@ -306,8 +310,7 @@ for Shotn in shot_list:
             res_file.write('%14.4f' % strike_point['outer'][0])
             res_file.write('%14.4f' % strike_point['outer'][1])
             res_file.write('%14.4f' % q95)
-            res_file.write('%14.4f' % (
-                        3 / 2 * betta_I_sakharov[ind] * (mu0 * I_coil['Ipl'] * 1000 * I_coil['Ipl'] * 1000 * R) / 4))
+            res_file.write('%14.4f' % (1.6 * pi * W_all *1e-4 / (3*Bt[ind]*Bt[ind]*V)))
             res_file.write('\n')
         #cont = int(input('continue?'))
     pdf_file.close()

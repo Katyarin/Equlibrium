@@ -71,17 +71,21 @@ def dia_data(shot, recoupment, delta_time, start_time=0, end_time=0):
     if end_time:
         t_end = end_time
     print(t_start, t_end)
-    time_need = [i/10 for i in range(int((t_start*10000)+ delta_time*10), int(t_end*10000), int(delta_time*10))]
+    time_need = [round(i/100,1) for i in range(int((t_start*100000)+ delta_time*100), int(t_end*100000), int(delta_time*100))]
     print(time_need)
     for i in [1,2]:
         plt.figure()
         plt.title(data_name_need[i])
-        plt.plot(data[data_name_need[i]]['time'], data[data_name_need[i]]['data'], label=shot)
-        plt.plot(recoupment_data[data_name_need[i]]['time'], recoupment_data[data_name_need[i]]['data'], label='recoupment #' + str(recoupment))
+        plt.plot(data[data_name_need[i]]['time'], data[data_name_need[i]]['data'], label='plasma shot')
+        plt.plot(recoupment_data[data_name_need[i]]['time'], recoupment_data[data_name_need[i]]['data'], label='without plasma')
         plt.grid()
         plt.axvline(t_start, color='r')
         plt.axvline(t_end, color='r')
+        plt.xlabel('time, s', fontsize=16)
+        plt.ylabel('Signal, V', fontsize=16)
+
         plt.legend()
+        plt.xlim(0, 0.4)
 
     plt.figure()
     plt.plot(data['Ip внутр.(Пр2ВК) (инт.18)']['time'], data['Ip внутр.(Пр2ВК) (инт.18)']['data'])
@@ -89,12 +93,21 @@ def dia_data(shot, recoupment, delta_time, start_time=0, end_time=0):
     plt.axvline(t_end, color='r')
 
 
-
     dia_sig1 = [data['Диамагнитный сигнал (новый инт.)']['data'][i] + data['Ics (4CS) (инт.22)']['data'][i] * 8e-6 for i in range(len(data['Ics (4CS) (инт.22)']['data']))]
     dia_sig2 = [recoupment_data['Диамагнитный сигнал (новый инт.)']['data'][i] + recoupment_data['Ics (4CS) (инт.22)']['data'][i] * 8e-6 for i in range(len(data['Ics (4CS) (инт.22)']['data']))]
 
     diamagnetic_sig = {'time': data['Диамагнитный сигнал (новый инт.)']['time'],
                        'data': [(dia_sig1[i] - dia_sig2[i]) * 2.915 for i in range(len(dia_sig1))]}
+    plt.figure()
+    plt.plot(diamagnetic_sig['time'], diamagnetic_sig['data'])
+    plt.xlabel('time, s', fontsize=16)
+    plt.ylabel(r'$\Psi$, mWb', fontsize=16)
+    plt.grid()
+    plt.axvline(t_start, color='r')
+    plt.axvline(t_end, color='r')
+    plt.xlim(0, 0.4)
+
+
     with open('test.txt', 'w') as file2:
         for t_ind in range(len(diamagnetic_sig['time'])):
             file2.write(str(diamagnetic_sig['time'][t_ind]))
@@ -126,12 +139,14 @@ def dia_data(shot, recoupment, delta_time, start_time=0, end_time=0):
         file.write('psidia,')
         file.write('Ip,')
         file.write('Bt,')
+        file.write('Rav,')
         file.write('betadia')
         file.write('\n')
         for i, t in enumerate(diamagnetic_sig['time']):
             for j, p in enumerate(time_need):
                 if p + 0.006 > t*1000 > p - 0.001 :
-                    Bt = 0.2* 16 * data['Itf (2TF)(инт.23)']['data'][i] /1e6/Rav_list[j]
+                    Bt = 0.2 \
+                         * 16 * data['Itf (2TF)(инт.23)']['data'][i] /1e6/Rav_list[j]
                     beta_dia = 1- (k_list[j] *k_list[j] +1) / (2*k_list[j]) * Bt *diamagnetic_sig['data'][i] / (20*pi*Ip_all[i]/1e6*Ip_all[i]/1e6)
                     print(Ip_all[i] / 1e6, Bt, beta_dia)
                     #print(p, diamagnetic_sig['data'][i], Ip_all[i]/1e6, Bt, beta_dia)
@@ -139,10 +154,11 @@ def dia_data(shot, recoupment, delta_time, start_time=0, end_time=0):
                     file.write('%5.4f,' % diamagnetic_sig['data'][i])
                     file.write('%5.4f,' % (Ip_all[i]/1e6))
                     file.write('%5.4f,' % Bt)
+                    file.write('%5.4f,' % Rav_list[j])
                     file.write('%5.4f' % beta_dia)
                     file.write('\n')
         print('dia_file saved')
 
-'''shotn = 42325
-rec = 42291
-dia_data(shotn, rec, 2.5, end_time=0)'''
+'''shotn = 43128
+rec = 43097
+dia_data(shotn, rec, 2, 0.178, 0.240)'''

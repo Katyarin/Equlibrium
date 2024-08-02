@@ -11,6 +11,8 @@ from scipy import interpolate as inter
 import get_TS
 from pathlib import Path
 import asyncio
+import shutil
+import copy
 
 done_process = []
 pi = 3.14159265359
@@ -29,8 +31,6 @@ def get_coils(Shotn, time, shotn_sub: int=0, path: str='/'):
     print('//172.16.12.127/Pub/!!!CURRENT_COIL_METHOD/magn_data%s' %path)
     signals = niifaRipper.extract_niifa('//172.16.12.127/Pub/!!!CURRENT_COIL_METHOD/magn_data%s' %path, Shotn)
     print(signals.keys())
-
-
 
     i_need = ['Ipf1', 'Ipf2', 'Ipf3', 'Ics', 'Ipl', 'Icc', 'Ihfc', 'Ivfc']
 
@@ -101,7 +101,8 @@ def DURS_upd(Shotn, time, Ip, betta_po, alf11, alf22, N=0):
     #print('DURS.DAT updated')
 
 
-def COIL_upd(Shotn, time, I_coil, Bt, N=0):
+def COIL_upd(Shotn, time, I_coil, Bt, Rav, N=0, Ipf2oposite=False, Icc2=0, Ihfc=1, Ivfc=1):
+    coilcount = 0
     COIL = []
     if N:
         PATH_loc = PATH + 'PET' + str(N) + '/'
@@ -115,13 +116,18 @@ def COIL_upd(Shotn, time, I_coil, Bt, N=0):
     COIL_comments = []
 
     i = 0
-    for line in COIL_new:
+    for line_i, line in enumerate(COIL_new):
         COIL_comments.append([])
         for element in range(len(line)):
             if line[element] == '!' or line[element][0] == '!':
-                COIL_comments[i]= line[element:]
-                del line[element:]
-                break
+                if Ihfc and 26 > line_i > 16 and element == 0:
+                    del line[element]
+                if Ivfc and 30 > line_i > 25 and element == 0:
+                    del line[element]
+                else:
+                    COIL_comments[i]= line[element:]
+                    del line[element:]
+                    break
         i += 1
 
     for line in range(len(COIL_new)):
@@ -132,34 +138,71 @@ def COIL_upd(Shotn, time, I_coil, Bt, N=0):
     COIL_comments[0][7] = ' t=' + str(time) + 's,'
     COIL_comments[0][8] = ' Ip=' + str(round(I_coil['Ipl'] / 1e3, 3))
 
-
-    for i in [3, 5]:
+    for i in [3, 6]:
         COIL_new[i][6] = I_coil['Ipf1'] * 1e-3
 
-    for i in [8, 10]:
-        COIL_new[i][6] = I_coil['Ipf2'] * 1e-3
+    if Ipf2oposite:
+        COIL_new[8][6] = I_coil['Ipf2'] * 1e-3
+        COIL_new[10][6] = - I_coil['Ipf2'] * 2 * 1e-3
 
-    for i in [13, 15]:
+        COIL_new[10][8] = 3
+        for i in [13, 15]:
+            COIL_new[i][8] = 4
+        for i in [18, 20, 22, 24]:
+            COIL_new[i][8] = 5
+        for i in [27, 29]:
+            COIL_new[i][8] = 6
+        for i in range(32,43,2):
+            COIL_new[i][8] = 7
+        for i in range(45, 56, 2):
+            COIL_new[i][8] = 8
+    else:
+        for i in [9, 12]:
+            COIL_new[i][6] = I_coil['Ipf2'] * 1e-3
+
+    for i in [15, 18]:
         COIL_new[i][6] = I_coil['Ipf3'] * 1e-3
 
-    for i in [18, 20, 22, 24]:
+    for i in [21, 24, 27, 30]:
         COIL_new[i][6] = I_coil['Ihfc'] * 1e-3
 
-    for i in [27, 29]:
+    for i in [33, 36]:
         COIL_new[i][6] = I_coil['Ivfc'] * 1e-3
 
-    for i in range(32,43,2):
-        COIL_new[i][6] = I_coil['Icc'] * 1e-3
+    if Icc2:
+        for i in range(32,36,2):
+            COIL_new[i][6] = I_coil['Icc'] * 1e-3
+        for i in range(36,39,2):
+            COIL_new[i][6] = Icc2 * 1e-3
+            COIL_new[i][8] = 7
+        for i in range(40,43,2):
+            COIL_new[i][6] = I_coil['Icc'] * 1e-3
+        for i in range(45, 56, 2):
+            COIL_new[i][8] = 8
+    else:
+        for i in range(39,57,3):
+            COIL_new[i][6] = I_coil['Icc'] * 1e-3
+            COIL_new[i][8] = 6
 
-    for i in range(45,56,2):
+    for i in range(57,74,3):
         COIL_new[i][6] = I_coil['Ics'] * 1e-3
+
+    if Ihfc == 0:
+        for i in range(17, 25):
+            COIL_new[i].insert(0, '!')
+
+    if Ivfc == 0:
+        for i in range(26, 30):
+            COIL_new[i].insert(0, '!')
 
     with open(PATH_loc + 'COIL.DAT', 'w') as file4:
         for line in range(len(COIL_new)):
             for element in range(len(COIL_new[line])):
                 #print(el)
                 el = COIL_new[line][element]
-                if (abs(el) > 10 and len(COIL_new[line]) < 2) or element == 8:
+                if el == '!':
+                    file4.write(' %s' % el)
+                elif (abs(el) > 10 and len(COIL_new[line]) < 2) or element == 8:
                     file4.write(' %i' % el)
                 elif abs(el) > 0.0099 and abs(el) < 1 and abs(el) != 0:
                     file4.write(' %8.5f' % el)
@@ -176,12 +219,212 @@ def COIL_upd(Shotn, time, I_coil, Bt, N=0):
     with open(PATH_loc + 'DINA_ADD.DAT', 'w') as file5:
         file5.write(' RSO  ( cm)   BT0 (kGauss) ')
         file5.write('\n')
-        file5.write(str(' 36.          ' + str(int(Bt*10)) + '.'))
+        file5.write(str(' ' + str(round(Rav)) + '.          ' + str(round(Bt*10, 1))))
         file5.write('\n')
         file5.write('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         #print('DINA_ADD.DAT updated')
 
-def DATA_upd(conf, N=0):
+
+def newCOIL_upd(Shotn, time, Ipl, Rav, Bt, new_data, N=0):
+    '''data format:
+    data = {'PF1_0': {'Icoil': 3e-4},
+        'PF1_1': {'Icoil': 3e-4},
+        'PF2_0': {},
+        'PF2_1': {'Icoil': -0.0011, 'link': 2},
+        'PF3_0': {},
+        'PF3_1': {},
+        'HFC1_0': {'existing': 1},
+        'HFC1_1': {'existing': 1},
+        'HFC2_0': {'existing': 1},
+        'HFC2_1': {'existing': 1},
+        'VFC_0': {},
+        'VFC_1': {},
+        'CC1_0': {},
+        'CC1_1': {},
+        'CC2_0': {},
+        'CC2_1': {},
+        'CC3_0': {},
+        'CC3_1': {},
+        'CS_0': {},
+        'CS_1': {},
+        'CS_2': {},
+        'CS_3': {},
+        'CS_4': {},
+        'CS_5': {}
+        }
+    keys:
+    'r': ,
+   'z': ,
+   'dr': ,
+   'dz': ,
+   'slope': ,
+   'angle': ,
+   'Icoil': ,
+   'n_turn': ,
+   'link': ,
+   'nsec':,
+   'existing': ,
+   'else':
+    '''
+    COIL = []
+    if N:
+        PATH_loc = PATH + 'PET' + str(N) + '/'
+    else:
+        PATH_loc = PATH
+
+
+    with open(PATH_loc + 'COIL.DAT', 'r') as file3:
+        for line in file3:
+            COIL.append(line.split())
+
+    ncur = COIL[0][0]
+
+    COIL[0][7] = '#' + str(Shotn)
+    COIL[0][8] = ' t=' + str(time) + 's,'
+    COIL[0][9] = ' Ip=' + str(round(Ipl / 1e3, 3))
+
+    coilRes = {'PF1': '1d10',
+               'PF2': '1d10',
+               'PF3': '1d10',
+               'HFC': '0d0',
+               'VFC': '1d10',
+               'CC': '1d10',
+               'CS': '1d10',
+               }
+
+    coil_old_data = {}
+
+    coil_count = 0
+    current_coil = ''
+    coils_list = []
+    ex = True
+    for line in COIL[1:]:
+        if len(line):
+            if line[0] == '!':
+                line = line[1:]
+                ex = False
+            else:
+                ex = True
+        if len(line) == 1:
+            nsec = int(line[0])
+        elif len(line) > 2:
+            #print(len(line))
+            #print(line)
+
+            if line[10] != current_coil:
+                coil_count = 0
+                current_coil = line[10]
+                coils_list.append(line[10])
+            coil_old_data[current_coil + '_' + str(coil_count)] = {'r': float(line[0]),
+                                                                   'z': float(line[1]),
+                                                                   'dr': float(line[2]),
+                                                                   'dz': float(line[3]),
+                                                                   'slope': float(line[4]),
+                                                                   'angle': float(line[5]),
+                                                                   'Icoil': float(line[6]),
+                                                                   'n_turn': float(line[7]),
+                                                                   'link': int(line[8]),
+                                                                   'nsec': nsec,
+                                                                   'existing': ex,
+                                                                   'else': '' if len(line) <= 11 else line[11:]}
+            coil_count+=1
+
+    link = 0
+    #print(coil_old_data)
+    cur_link = 0
+    coil_new_data = copy.deepcopy(coil_old_data)
+    for data in new_data.keys():
+        #print(data, link)
+        #coil_new_data[data] = coil_old_data[data]
+        for parametr in new_data[data].keys():
+            if parametr == 'link':
+                link = new_data[data][parametr] - coil_old_data[data]['link']
+                '''if new_data[data][parametr] > coil_old_data[data]['link']:
+                    link = new_data[data][parametr] - coil_old_data[data]['link']
+                if new_data[data][parametr] < coil_old_data[data]['link']:
+                    link -= 1'''
+
+            if parametr == 'existing':
+                if coil_old_data[data]['existing'] != new_data[data][parametr]:
+                    #print(coil_old_data[data]['link'], cur_link)
+                    if coil_old_data[data]['link'] != cur_link:
+                        cur_link = coil_old_data[data]['link']
+                        if new_data[data][parametr]:
+                            link += 1
+                        else:
+                            link -= 1
+            coil_new_data[data][parametr] = new_data[data][parametr]
+        coil_new_data[data]['link'] = coil_old_data[data]['link'] + link
+        #print(coil_new_data[data]['link'])
+    with open(PATH_loc + 'DINA_ADD.DAT', 'w') as file5:
+        file5.write(' RSO  ( cm)   BT0 (kGauss) ')
+        file5.write('\n')
+        file5.write(str(' ' + str(round(Rav)) + '.          ' + str(round(Bt * 10, 1))))
+        file5.write('\n')
+        file5.write('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        # print('DINA_ADD.DAT updated')
+
+    #print(coil_old_data)
+    forcCoilRes = []
+
+    curLink = 0
+    for coil in coil_new_data.keys():
+        if coil[0] == 'C':
+            numSym = 2
+        else:
+            numSym = 3
+        if coil_new_data[coil]['link'] != curLink:
+            curLink = coil_new_data[coil]['link']
+            forcCoilRes.append('%i    ! %s' %(coil_new_data[coil]['link'], coil[:numSym]))
+            forcCoilRes.append(coilRes[coil[:numSym]])
+
+    forcCoilRes.insert(0, '%i    ! NEQUI - number of equivalent coil groups, start' %curLink)
+    forcCoilRes.extend(['', 'PFC      PFC', 'Equiv.   Resis.', 'Sign     (micOM)', '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'])
+
+
+
+    with open(PATH_loc + 'COILRES.DAT', 'w') as file7:
+        for line in forcCoilRes:
+            file7.write(line)
+            file7.write('\n')
+
+
+    COIL_new = []
+    COIL_new.append(COIL[0])
+    for coil in coil_new_data.keys():
+        COIL_new.append([])
+        COIL_new.append(['' if coil_new_data[coil]['existing'] else '!', coil_new_data[coil]['nsec']])
+        COIL_new.append(['' if coil_new_data[coil]['existing'] else '!', coil_new_data[coil]['r'],coil_new_data[coil]['z'], coil_new_data[coil]['dr'],coil_new_data[coil]['dz'],
+                         coil_new_data[coil]['slope'], coil_new_data[coil]['angle'], coil_new_data[coil]['Icoil'],
+                         coil_new_data[coil]['n_turn'], coil_new_data[coil]['link'], '!', coil[:-2], coil_old_data[coil]['else']])
+
+    #print(COIL_new)
+
+    with open(PATH_loc + 'COIL.DAT', 'w') as file4:
+        for line in COIL_new:
+            for el in line:
+                if type(el) == str:
+                    file4.write(' %s' % el)
+                elif type(el) == int:
+                    file4.write(' %i' % el)
+                elif type(el) == float or type(el) == np.float64:
+                    if abs(el) > 1:
+                        file4.write(' %9.1f' % el)
+                    elif abs(el) == 0:
+                        file4.write(' %9i.' % el)
+                    elif 0 < abs(el) < 1e-3:
+                        file4.write(' %9.4e' % el)
+                    else:
+                        file4.write(' %9.4f' % el)
+                elif type(el) == list:
+                    for i in el:
+                        file4.write(' ' + str(i))
+                else:
+                    file4.write(el)
+            file4.write('\n')
+
+
+def DATA_upd(conf, xPoint: tuple=(0,0), N=0):
     DATA = []
     if N:
         PATH_loc = PATH + 'PET' + str(N) + '/'
@@ -196,6 +439,14 @@ def DATA_upd(conf, N=0):
         DATA_new[8][0] = '1'
     if conf == 'div':
         DATA_new[8][0] = '0'
+
+    if xPoint[0] != 0 and xPoint[1] != 0:
+        if xPoint[1] > 0:
+            DATA_new[12][0] = '%.2fd0' %xPoint[0]
+            DATA_new[13][0] = '%.2fd0' %xPoint[1]
+        if xPoint[1] < 0:
+            DATA_new[10][0] = '%.2fd0' %xPoint[0]
+            DATA_new[11][0] = '%.2fd0' %xPoint[1]
 
     with open(PATH_loc + 'DATA.DAT', 'w') as file2:
         for line in DATA_new:
@@ -253,45 +504,13 @@ def EVOL_res(N=0):
                       'Rc': Rc}
         return Result
 
-def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', inside=False, share=False, N=0):
-
+def out_data_read(Shotn, time, PATH_loc, share=False, curr=False):
     out_data_raw = []
-    if N:
-        PATH_loc = PATH + 'PET' + str(N) + '/'
-    else:
-        PATH_loc = PATH
 
     with open(PATH_loc + 'out.wr', 'r') as file:
         for line in file:
             out_data_raw.extend(line.split())
 
-
-    q_data = {}
-    line_count = 0
-    with open(PATH_loc + 'q.pr', 'r') as q_file:
-        for line in q_file:
-            data = line.split()
-            if line_count < 1:
-                line_count+=1
-                continue
-            elif line_count == 1:
-                for i in data:
-                    q_data[i] = []
-                line_count += 1
-            elif line_count < 63:
-                i = 0
-                for key in q_data.keys():
-                    q_data[key].append(float(data[i]))
-                    i+=1
-                line_count += 1
-            elif line_count == 65:
-                Ftor_pl = float(data[4])
-                line_count += 1
-            else:
-                line_count += 1
-
-    #print(q_data.keys())
-    P_axis = q_data['P'][0]
     out_data = out_data_raw
     for i in range(len(out_data_raw)):
         out_data[i] = float(out_data_raw[i])
@@ -316,7 +535,7 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
     for j in range(nj):
         ugr.append(out_data[nugr + ni * j:nugr + ni * (j + 1)])
         curf.append(out_data[nugr + ni * nj + ni * j: nugr + ni * nj + ni * (j + 1)])
-        ipr.append(out_data[nugr + 2 * ni * nj + ni *j: nugr + 2 * ni * nj + ni * (j + 1)])
+        ipr.append(out_data[nugr + 2 * ni * nj + ni * j: nugr + 2 * ni * nj + ni * (j + 1)])
 
     norm_ugr = []
     for i, elem in enumerate(ugr):
@@ -361,7 +580,134 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
     rxb = out_data[nipr + 7:nipr + 7 + nxb]
     zxb = out_data[nipr + 7 + nxb:nipr + 7 + 2 * nxb]
 
+    if share:
+        with open(PATH_res + str(Shotn) + '_' + str(round(time, 3)) + '_dots.txt', 'w') as dotfile:
+            dotfile.write('magnetic axis    ')
+            dotfile.write(' %8.5f ' % rm)
+            dotfile.write(' %8.5f ' % zm)
+            dotfile.write('\n')
+            dotfile.write('x-dot    ')
+            dotfile.write(' %8.5f ' % rx0)
+            dotfile.write(' %8.5f ' % zx0)
     # slen=sum(((rxb(2:nxb)-rxb(1:nxb-1)).^2+(zxb(2:nxb)-zxb(1:nxb-1)).^2).^0.5)
+
+    """CURRENT"""
+    zst = 1000
+    for i in range(len(zgr)):
+        if zst > abs(zm - zgr[i]):
+            zst = abs(zm - zgr[i])
+            jst = i
+
+    # print(zst, jst)
+
+    zst = 1000
+    for i in range(len(zgr)):
+        if zst > abs(0 - zgr[i]):
+            zst = abs(0 - zgr[i])
+            js0 = i
+
+    # print(zst, js0)
+
+    k = -1
+    curf2 = []
+    rsn = []
+    for i in range(ni):
+        if abs(float(curf[jst][i])) > 1e-5:
+            k = k + 1
+            if k == 0:
+                curf2.append(float(curf[jst][i - 1]))
+                rsn.append(rgr[i - 1])
+            curf2.append(float(curf[jst][i]))
+            rsn.append(rgr[i])
+            ki = i
+
+    curf2.append(float(curf[jst][ki + 1]))
+    rsn.append(rgr[ki + 1])
+
+    sum1 = []
+    for i in range(len(curf)):
+        sum1.append(sum(curf[i]))
+
+    Ipl = sum(sum1) * (rgr[1] - rgr[0]) * (zgr[1] - zgr[0])
+
+    if curr:
+        plt.figure()
+        plt.plot(rsn, [i / Ipl for i in curf2])
+        plt.grid()
+        plt.ylim(0, 15)
+        plt.xlim(0.1, 0.7)
+        plt.ylabel('MA/(m*m)')
+        plt.xlabel('r(m)')
+
+    return rgr, zgr, ugr, up, rx0, zx0, rm, zm, norm_ugr, ipr, js0
+
+def bound(Shotn, time, rgr, zgr, ugr, up, share):
+    cs = plt.contour(rgr, zgr, ugr, levels=[up], colors='b', alpha=0.01)
+    bound = cs.allsegs
+    x = []
+    y = []
+    bound_ind = 0
+    if len(bound[0]) > 1:
+        max_bound = 0
+        index_max = 0
+        for i in range(len(bound[0])):
+            if max_bound < len(bound[0][i]):
+                max_bound = len(bound[0][i])
+                index_max = i
+        bound_ind = index_max
+    # print(bound_ind)
+    for i in bound[0][bound_ind]:
+        # print(i)
+        x.append(float(i[0]))
+        y.append(float(i[1]))
+
+    if share:
+        with open(PATH_res + str(Shotn) + '_' + str(round(time, 3)) + '_bound.txt', 'w') as bndfile:
+            for i, ri in enumerate(x):
+                bndfile.write(' %8.5f ' % ri)
+                bndfile.write(' %8.5f ' % y[i])
+                bndfile.write('\n')
+    return x, y
+def q_data_read(Shotn, time, PATH_loc):
+    q_data = {}
+    line_count = 0
+    shutil.copyfile(PATH_loc + 'q.pr', PATH_res + str(Shotn) + '_' + str(round((time), 3)) + '_q_all.txt')
+
+    with open(PATH_loc + 'q.pr', 'r') as q_file:
+        for line in q_file:
+            data = line.split()
+            if line_count < 1:
+                line_count += 1
+                continue
+            elif line_count == 1:
+                for i in data:
+                    q_data[i] = []
+                line_count += 1
+            elif line_count < 63:
+                i = 0
+                for key in q_data.keys():
+                    q_data[key].append(float(data[i]))
+                    i += 1
+                line_count += 1
+            elif line_count == 65:
+                Ftor_pl = float(data[4])
+                line_count += 1
+            else:
+                line_count += 1
+
+    return q_data, Ftor_pl
+
+def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', inside=False, share=False, N=0):
+    if N:
+        PATH_loc = PATH + 'PET' + str(N) + '/'
+    else:
+        PATH_loc = PATH
+
+    rgr, zgr, ugr, up, rx0, zx0, rm, zm, norm_ugr, ipr, js0 = out_data_read(Shotn, time, PATH_loc, share, curr)
+
+    q_data, Ftor_pl = q_data_read(Shotn, time, PATH_loc)
+
+    P_axis = q_data['P'][0]
 
     if show == True:
         #plt.figure(figsize=(5, 8))
@@ -375,36 +721,10 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
         cs = plt.contour(rgr, zgr, ugr, levels=[up], colors='b', alpha=0.01)
     if inside:
         ax.contour(rgr, zgr, ugr, levels=20, colors='b', alpha=0.1)
-    bound = cs.allsegs
-    x = []
-    y = []
-    bound_ind = 0
-    if len(bound[0]) > 1:
-        max_bound = 0
-        index_max = 0
-        for i in range(len(bound[0])):
-            if max_bound < len(bound[0][i]):
-                max_bound = len(bound[0][i])
-                index_max = i
-        bound_ind = index_max
-    #print(bound_ind)
-    for i in bound[0][bound_ind]:
-        # print(i)
-        x.append(float(i[0]))
-        y.append(float(i[1]))
-    # plt.figure(figsize=(5,8))
+
+    x, y = bound(Shotn, time, rgr, zgr, ugr, up, share)
     if show == True:
         ax.plot(x, y, 'g', label='PET')
-
-
-
-
-    if share:
-        with open(PATH_res + str(Shotn) + '_' + str(round(time, 3)) + '_bound.txt', 'w') as bndfile:
-            for i, ri in enumerate(x):
-                bndfile.write(' %8.5f ' % ri)
-                bndfile.write(' %8.5f ' % y[i])
-                bndfile.write('\n')
 
     with open(PATH + 'MCC.json', 'r') as file2:
         mcc_bound = json.load(file2)
@@ -467,63 +787,7 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
         for j in range(2):
             ax.scatter(strike_point[list(strike_point.keys())[j]][0], strike_point[list(strike_point.keys())[j]][1], marker='*')
 
-    if share:
-        with open(PATH_res + str(Shotn) + '_' + str(round(time, 3)) + '_dots.txt', 'w') as dotfile:
-            dotfile.write('magnetic axis    ')
-            dotfile.write(' %8.5f ' % rm)
-            dotfile.write(' %8.5f ' % zm)
-            dotfile.write('\n')
-            dotfile.write('x-dot    ')
-            dotfile.write(' %8.5f ' % rx0)
-            dotfile.write(' %8.5f ' % zx0)
 
-    """CURRENT"""
-    zst = 1000
-    for i in range(len(zgr)):
-        if zst > abs(zm - zgr[i]):
-            zst = abs(zm - zgr[i])
-            jst = i
-
-    #print(zst, jst)
-
-    zst = 1000
-    for i in range(len(zgr)):
-        if zst > abs(0 - zgr[i]):
-            zst = abs(0 - zgr[i])
-            js0 = i
-
-    #print(zst, js0)
-
-    k = -1
-    curf2 = []
-    rsn = []
-    for i in range(ni):
-        if abs(float(curf[jst][i])) > 1e-5:
-            k = k + 1
-            if k == 0:
-                curf2.append(float(curf[jst][i - 1]))
-                rsn.append(rgr[i - 1])
-            curf2.append(float(curf[jst][i]))
-            rsn.append(rgr[i])
-            ki = i
-
-    curf2.append(float(curf[jst][ki + 1]))
-    rsn.append(rgr[ki + 1])
-
-    sum1 = []
-    for i in range(len(curf)):
-        sum1.append(sum(curf[i]))
-
-    Ipl = sum(sum1) * (rgr[1] - rgr[0]) * (zgr[1] - zgr[0])
-
-    if curr:
-        plt.figure()
-        plt.plot(rsn, [i / Ipl for i in curf2])
-        plt.grid()
-        plt.ylim(0, 15)
-        plt.xlim(0.1, 0.7)
-        plt.ylabel('MA/(m*m)')
-        plt.xlabel('r(m)')
 
     """PRESSURE"""
     P_psi = inter.interp1d(q_data['Psi'], q_data['P'], kind='cubic')
@@ -573,6 +837,36 @@ def compare_bound(Shotn, time, par, ax, show=False, curr=False, compare='dot', i
             else:
                 q_q[i].append(0)
 
+    """Bt"""
+    BtR = inter.interp1d(q_data['Psi'], q_data['Bt,totR'], kind='cubic')
+    BtRpl = inter.interp1d(q_data['Psi'], q_data['Bt,plR'], kind='cubic')
+    #Psi_from_R = inter.interp1d(rgr, norm_ugr[js0],  kind='cubic')
+
+    time_for_save = round(time, 4)
+    path_res = 'eq_results/%s/' % Shotn
+    try:
+        with open(path_res + 'Bt.json', 'r') as bt_file:
+            Bt = json.load(bt_file)
+    except FileNotFoundError:
+        Bt = {}
+    BtR2 = []
+    BtRpl2 = []
+    #r_bt = []
+    Bt[time_for_save] = {}
+    Bt[time_for_save]['psi'] = []
+    Bt[time_for_save]['r'] = []
+    for i in range(len(q_data['Psi'])):
+        if norm_ugr[js0][i] > min(q_data['Psi']):
+            if norm_ugr[js0][i] < max(q_data['Psi']):
+                BtR2.append(float(BtR(norm_ugr[js0][i]) / rgr[i]))
+                BtRpl2.append(float(BtRpl(norm_ugr[js0][i]) / rgr[i]))
+                Bt[time_for_save]['psi'].append(norm_ugr[js0][i])
+                Bt[time_for_save]['r'].append(rgr[i])
+    Bt[time_for_save]['Btot'] = BtR2
+    Bt[time_for_save]['Bpl'] = BtRpl2
+
+    with open(path_res + 'Bt.json', 'w') as bt_file:
+        json.dump(Bt, bt_file)
     '''profiles'''
     if share:
         path_res = 'eq_results/%s/' % Shotn
@@ -1013,6 +1307,7 @@ def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
     P_TS = P_TS_raw[:ind_max_for_prof]
     R_TS = R_TS_raw[:ind_max_for_prof]
     ne['ne'] = ne_raw['ne'][:ind_max_for_prof]
+    ne['err'] = ne_raw['err'][:ind_max_for_prof]
 
     zst = 1000
     for i in range(len(zgr)):
@@ -1025,6 +1320,7 @@ def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
     P_TS_psi = inter.interp1d(Psi_R_for_TS(R_TS), P_TS, kind='linear')
 
     ne_TS_psi = inter.interp1d(Psi_R_for_TS(R_TS), ne['ne'], kind='linear')
+    ne_TS_psi_err = inter.interp1d(Psi_R_for_TS(R_TS), ne['err'], kind='linear')
 
     ne_psi = []
     for i in norm_ugr[js0]:
@@ -1035,7 +1331,17 @@ def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
         else:
             ne_psi.append(0)
 
+    ne_psi_err = []
+    for i in norm_ugr[js0]:
+        if max(Psi_R_for_TS(R_TS)) > i > min(Psi_R_for_TS(R_TS)):
+            ne_psi_err.append(ne_TS_psi_err(i))
+        elif i > max(Psi_R_for_TS(R_TS)):
+            ne_psi_err.append(ne_TS_psi_err(max(Psi_R_for_TS(R_TS))))
+        else:
+            ne_psi_err.append(0)
+
     ne_r = inter.interp1d(rgr, ne_psi, kind='linear')
+    ne_r_err = inter.interp1d(rgr, ne_psi_err, kind='linear')
 
     ne_all_psi = []
 
@@ -1149,15 +1455,17 @@ def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
                 print(Ti_li)'''
 
             with open('c:/work/equilibrium/Zeff_data/' + str(Shotn) + '_Zeff.txt', 'r') as Zeff_file:
-                Zeff_data = {'time': [], 'data': []}
+                Zeff_data = {'time': [], 'data': [], 'err': []}
                 for line in Zeff_file:
                     data = line.split()
                     Zeff_data['time'].append(float(data[1]) * 1e3)
                     Zeff_data['data'].append(float(data[3]))
+                    Zeff_data['err'].append(float(data[4]))
             #print(Zeff_data)
             if round(time, 1) in time_li:
                 Ri_raw = Ri_li[int(round(time * 10))]
                 Ti_raw = Ti_li[int(round(time * 10))]
+                Ti_raw_delta = Ti_err_li[int(round(time * 10))]
                 ind_max_for_prof_i = 0
                 for i, rr in enumerate(Ri_raw):
                     if rr/1000 < r_axis - 0.010:
@@ -1169,21 +1477,26 @@ def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
                 print('we are here')'''
                 ni = ne_r([elem / 1000 for elem in Ri])
                 ni_raw = ne_r([elem / 1000 for elem in Ri_raw])
+                ni_raw_err = ne_r_err([elem / 1000 for elem in Ri_raw])
                 Zeff = 0
+                delta_Zeff = 0
                 count_Zeff = 0
                 for i, el in enumerate(Zeff_data['time']):
                     if time - 5 < el < time + 5:
                         print(el)
                         print(Zeff_data['data'][i])
                         Zeff += Zeff_data['data'][i]
+                        delta_Zeff += Zeff_data['err'][i]
                         count_Zeff +=1
                 Zeff = Zeff / count_Zeff
+                delta_Zeff = delta_Zeff / count_Zeff
                 print(Zeff)
                 #print('Zeff:', Zeff)
                 ni_coeff = (Zeff - Z2) / (Z1 * Z1 - Z1 * Z2)
                 #print(ni_coeff)
                 Pi = [Ti[i] * ni[i] * ni_coeff * q * 1e-6 for i in range(len(Ri))]
                 Pi_raw = [Ti_raw[i] * ni_raw[i] * ni_coeff * q * 1e-6 for i in range(len(Ri_raw))]
+                Pi_err = [Pi_raw[i] * ((Ti_raw_delta[i]/Ti_raw[i])**2 + (delta_Zeff/(Zeff - Z2))**2 +(ni_raw_err[i]/ni_raw[i])**2)**0.5 for i in range(len(Ri_raw))]
                 # Pi_err = [Pi[i] * (Ti_err[i] / Ti[i]) for i in range(len(Ri))]
 
                 Pi_psi = inter.interp1d(Psi_R_for_TS([elem / 1000 for elem in Ri]), Pi, kind='linear')
@@ -1214,6 +1527,7 @@ def We(Shotn, time, rgr, zgr, norm_ugr, ipr, r_axis, Wi=False):
 
                 ex_prof[str(time)]['psi_i'] = list([float(i) for i in Psi_R_for_TS([elem / 1000 for elem in Ri_raw])])
                 ex_prof[str(time)]['Pi'] = list(Pi_raw)
+                ex_prof[str(time)]['Pi_err'] = list(Pi_err)
                 #ex_prof[str(time)]['ni'] = list(ne_raw['ne'])
                 #ex_prof[str(time)]['Ti'] = list(Te['Te'])
                 #ex_prof[str(time)]['prof_i'] = {'psi': norm_ugr[js0], 'Pi': ion_press[js0]}
@@ -1272,6 +1586,7 @@ def find_bound(Shotn, time, I_coil, betta_I, li, alf1=0, k=0, pdf=None, show2=Tr
         #print(result)
         if result == -1:
             print('NOT COUNT')
+            return -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1, -1, -1, -1
         else:
             name = '#' + str(Shotn) + ', time = ' + str(time) + ', bI = ' + str(betta_I) + '\n' + 'li = ' + str(round(result['li'], 2)) + ', bp = ' + str(round(result['betpol'], 2))
             fig = plt.figure(figsize=(6,10))
@@ -1430,4 +1745,74 @@ def find_par_fast(Shotn, time, I_coil, betta_po, pdf, psi_dia_sakh, show2=False)
     #print(min_par, min_par_want, minimum_delta, minimum)
     return min_par, min_par_want, res, minimum_delta, minimum, alpha[ind_min]
 
+def openDiaFile(Shotn, my):
+    dia_data = {}
+    try:
+        p = 0
+        dia_file = 'c:/work/equilibrium/dia_data/%d.txt' % Shotn
+        if my:
+            dia_file = 'c:/work/equilibrium/dia_data/my/%d.txt' % Shotn
+        with open(dia_file, 'r') as file:
+            for line in file:
+                data = line.split(',')
+                if p == 0:
+                    for i in data:
+                        dia_data[i] = []
+                    p += 1
+                else:
+                    for i, key in enumerate(list(dia_data.keys())):
+                        if data[i]:
+                            dia_data[key].append(float(data[i]))
+                        else:
+                            dia_data[key].append(0)
+    except:
+        print(dia_file)
+        print('file not found')
+        dia_file = 'c:/work/equilibrium/dia_data/%d.txt' % Shotn
+        with open(dia_file, 'r') as file:
+            for line in file:
+                data = line.split(',')
+                if p == 0:
+                    for i in data:
+                        dia_data[i] = []
+                    p += 1
+                else:
+                    for i, key in enumerate(list(dia_data.keys())):
+                        if data[i]:
+                            dia_data[key].append(float(data[i]))
+                        else:
+                            dia_data[key].append(0)
+    print(dia_data)
+
+    try:
+        l = 0
+        with open('c:/work/equilibrium/Ti_data/' + str(Shotn) + '.txt', 'r') as Ti_file:
+            for line in Ti_file:
+                data = line.split()
+                if l == 0:
+                    time_li = [float(data[i]) for i in range(1, len(data), 2)]
+                l+=1
+        print(time_li)
+        time_min = min(dia_data['time'])
+        time_max = max(dia_data['time'])
+        for t1 in time_li:
+            if time_min < t1 < time_max:
+                if t1 not in dia_data['time']:
+                    for i,t2 in enumerate(dia_data['time']):
+                        if t1 < t2:
+                            index = i
+                            break
+                    for key in dia_data.keys():
+                        if key=='time':
+                            dia_data[key].insert(index, t1)
+                        else:
+                            t2 = dia_data['time'][index+1]
+                            t0 = dia_data['time'][index-1]
+                            v2 = dia_data[key][index]
+                            v0 = dia_data[key][index-1]
+                            value = v0 + (v2-v0)*(t1-t0) / (t2 - t0)
+                            dia_data[key].insert(index, value)
+    except FileNotFoundError:
+        print("NO Ti data!")
+    return dia_data
 

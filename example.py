@@ -8,8 +8,8 @@ zb = []
 Path_res = 'results/'
 PATH = 'c:/work/equilibrium/Globus_PET/'
 
-Shotn = 42567
-time = 165 #ms
+Shotn = 44043
+time = 180 #ms
 
 z_need = 0
 

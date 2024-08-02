@@ -14,11 +14,13 @@ PATH = 'c:/work/equilibrium/Globus_PET/'
 #this test for fast search equlibrium with beta and li by delta_bound and delta_psi
 
 my = 1
+pf2 = 1
 b = str(datetime.date.today())
-tomorow = b[2:4] + b[5:7] + b[8:]
+tomorow = b[2:4] + b[5:7] + b[8:] + ''
 start_time = 0 #defolt 0, s
+#end_time = 0
 
-shot_list = [42121]
+shot_list = [44330]
 for Shotn in shot_list:
     print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!%i!!!!!!!!!!!!!!!!!!!!!!!!!!!!!' %Shotn)
     path_res = 'eq_results/%s/' % Shotn
@@ -130,9 +132,10 @@ for Shotn in shot_list:
         except FileNotFoundError:
             print('not found in new version')
             f = '//172.16.12.127/Pub/!!!CURRENT_COIL_METHOD/old_mcc/mcc_%d.json' % Shotn
-        time, Rc, Rcm, Rav, k, conf = Find_boundary.bound(f, time)
+        time, Rc, Rcm, Rav, k, conf, xCords = Find_boundary.bound(f, time, xDot=1)
         print('new time: ', time)
         print('configure: ', conf)
+        conf = 'lim'
         Rav = Rav / 100
 
 
@@ -145,9 +148,67 @@ for Shotn in shot_list:
                 I_coil['Ipl'] = I_coil_new[ind] * 1e3
 
         for fast_ind in range(9):
-            Globus_PET.COIL_upd(Shotn, time, I_coil, Bt[ind], N=fast_ind)
-            Globus_PET.DATA_upd(conf, N=fast_ind)
-
+            Globus_PET.COIL_upd(Shotn, time, I_coil, Bt[ind], Rav*100, N=fast_ind)
+            if pf2:
+                coil_data = {
+                    'PF1_0': {'Icoil': I_coil['Ipf1'] * 1e-3},
+                    'PF1_1': {'Icoil': I_coil['Ipf1'] * 1e-3},
+                    'PF2_0': {'Icoil': I_coil['Ipf2'] * 1e-3},
+                    #'PF2_0': {'Icoil': I_coil['Ipf2'] * 1e-3*0.9},
+                    'PF2_1': {'Icoil': I_coil['Ipf2'] * 1e-3, 'link': 3},
+                    'PF3_0': {'Icoil': I_coil['Ipf3'] * 1e-3},
+                    'PF3_1': {'Icoil': I_coil['Ipf3'] * 1e-3},
+                    'HFC1_0': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                    'HFC1_1': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                    'HFC2_0': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                    'HFC2_1': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                    'VFC_0': {'Icoil': I_coil['Ivfc'] * 1e-3},
+                    'VFC_1': {'Icoil': I_coil['Ivfc'] * 1e-3},
+                    'CC1_0': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 7},
+                    'CC1_1': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 7},
+                    'CC2_0': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 7},
+                    'CC2_1': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 7},
+                    'CC3_0': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 7},
+                    'CC3_1': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 7},
+                    'CS_0': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 8},
+                    'CS_1': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 8},
+                    'CS_2': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 8},
+                    'CS_3': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 8},
+                    'CS_4': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 8},
+                    'CS_5': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 8}
+                }
+                #print(fast_ind)
+                Globus_PET.newCOIL_upd(Shotn, time, I_coil['Ipl'], Rav*100, Bt[ind], coil_data, fast_ind)
+            else:
+                coil_data = {
+                    'PF1_0': {'Icoil': I_coil['Ipf1'] * 1e-3},
+                    'PF1_1': {'Icoil': I_coil['Ipf1'] * 1e-3},
+                    'PF2_0': {'Icoil': I_coil['Ipf2'] * 1e-3},
+                    'PF2_1': {'Icoil': I_coil['Ipf2'] * 1e-3, 'link': 2},
+                    'PF3_0': {'Icoil': I_coil['Ipf3'] * 1e-3},
+                    'PF3_1': {'Icoil': I_coil['Ipf3'] * 1e-3},
+                    'HFC1_0': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                    'HFC1_1': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                    'HFC2_0': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                    'HFC2_1': {'Icoil': I_coil['Ihfc'] * 1e-3},
+                    'VFC_0': {'Icoil': I_coil['Ivfc'] * 1e-3},
+                    'VFC_1': {'Icoil': I_coil['Ivfc'] * 1e-3},
+                    'CC1_0': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 6},
+                    'CC1_1': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 6},
+                    'CC2_0': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 6},
+                    'CC2_1': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 6},
+                    'CC3_0': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 6},
+                    'CC3_1': {'Icoil': I_coil['Icc'] * 1e-3, 'link': 6},
+                    'CS_0': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 7},
+                    'CS_1': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 7},
+                    'CS_2': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 7},
+                    'CS_3': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 7},
+                    'CS_4': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 7},
+                    'CS_5': {'Icoil': I_coil['Ics'] * 1e-3, 'link': 7}
+                }
+                # print(fast_ind)
+                Globus_PET.newCOIL_upd(Shotn, time, I_coil['Ipl'], Rav * 100, Bt[ind], coil_data, fast_ind)
+            Globus_PET.DATA_upd(conf, xPoint=xCords, N=fast_ind)
         if beta_past:
             beta_0 = beta_past
         else:
@@ -270,7 +331,7 @@ for Shotn in shot_list:
         mera_list2 = []
         if psi_delta_for_one_time[ind_min] > 0.04:
             for i in range(len(bounds_delta_for_one_time)):
-                mera_list1.append((psi_delta_for_one_time[i]/10 + bounds_delta_for_one_time[i]*10) / 2)
+                mera_list1.append((psi_delta_for_one_time[i] + bounds_delta_for_one_time[i]*10) / 2)
                 mera_list2.append((psi_delta_for_one_time[i] ** 2 + bounds_delta_for_one_time[i] ** 2) ** 0.5)
             print(min(mera_list1), mera_list1.index(min(mera_list1)),
                   bounds_delta_for_one_time[mera_list1.index(min(mera_list1))],
@@ -328,5 +389,10 @@ for Shotn in shot_list:
 
         beta_past = float(betta_I)
     pdf_file.close()
+    plt.figure()
+    plt.plot([i * 1000 for i in ftorpl_list], label='psiPET')
+    plt.plot(dia_data['psidia'], label='psiPET')
+    plt.legend()
     print('time left: ', - start_time + t.time())
+    plt.show()
 
